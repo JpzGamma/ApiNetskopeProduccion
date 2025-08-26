@@ -1,0 +1,28 @@
+services:
+  backend:
+    build:
+      context: ./apiNetskopeBackend
+      dockerfile: Dockerfile.dev
+    env_file:
+      - ./apiNetskopeBackend/.env.dev
+    volumes:
+      - ./apiNetskopeBackend/app:/app/app
+      - ./apiNetskopeBackend/.env.dev:/app/.env:ro
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./apiNetskopeFrontend
+      dockerfile: Dockerfile.dev
+    env_file:
+      - ./apiNetskopeFrontend/.env.dev
+    volumes:
+      - ./apiNetskopeFrontend/src:/app/src
+      - ./apiNetskopeFrontend/.env.dev:/app/.env:ro
+    ports:
+      - "3005:3005"
+    depends_on:
+      - backend
+    restart: unless-stopped
