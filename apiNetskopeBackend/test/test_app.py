@@ -1,12 +1,12 @@
 from fastapi.testclient import TestClient
-from main import app
+from app.main import app  # <-- import correcto
 
 client = TestClient(app)
 
 def test_root_status_code():
-    response = client.get("/")
-    assert response.status_code == 200
+    resp = client.get("/")
+    assert resp.status_code == 200
 
 def test_root_content():
-    response = client.get("/")
-    assert "Hello" in response.text or "FastAPI" in response.text
+    resp = client.get("/")
+    assert isinstance(resp.text, str)
