@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: ./apiNetskopeBackend
+      dockerfile: Dockerfile.prod
+    image: apinetskope_backend:prod
+    env_file:
+      - ./apiNetskopeBackend/.env.prod
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./apiNetskopeFrontend
+      dockerfile: Dockerfile.prod
+    image: apinetskope_frontend:prod
+    env_file:
+      - ./apiNetskopeFrontend/.env.prod
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
