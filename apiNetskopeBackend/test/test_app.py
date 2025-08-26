@@ -11,4 +11,4 @@ def test_root_content():
     resp = client.get("/")
     data = resp.json()
     # Tu endpoint devuelve {"message": "HOLA JPZ"}
-    assert data.get("message") == "HOLA JPZ"
+    assert data.get("message") == "CAMBIO Numero milll"
