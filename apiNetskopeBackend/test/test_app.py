@@ -10,5 +10,5 @@ def test_root_status_code():
 def test_root_content():
     resp = client.get("/")
     data = resp.json()
-    # Tu endpoint devuelve {"message": "HOLA JPZ"}
-    assert data.get("message") == "CAMBIO Numero milll"
+    
+    assert data.get("message") == "CAMBIO ONLY"
