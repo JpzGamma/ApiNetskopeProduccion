@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from app.main import app  # <-- import correcto
+from app.main import app
 
 client = TestClient(app)
 
@@ -9,4 +9,6 @@ def test_root_status_code():
 
 def test_root_content():
     resp = client.get("/")
-    assert isinstance(resp.text, str)
+    data = resp.json()
+    # Tu endpoint devuelve {"message": "HOLA JPZ"}
+    assert data.get("message") == "HOLA JPZ"
