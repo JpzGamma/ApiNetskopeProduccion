@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import Response
 from datetime import datetime, timezone
-
+from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth
 from app.config import settings
 
@@ -12,6 +12,14 @@ app = FastAPI(
 )
 
 app.include_router(auth.router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.FRONTEND_URL.rstrip("/")], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Mensaje en la raíz
 @app.get("/", include_in_schema=False, tags=["Meta"], summary="Service status")
