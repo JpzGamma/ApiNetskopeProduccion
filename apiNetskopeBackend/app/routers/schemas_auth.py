@@ -20,3 +20,10 @@ class TokenOut(BaseModel):
 
 class MessageOut(BaseModel):
     message: str
+
+class ForgotIn(BaseModel):
+    correo: EmailStr
+
+class ResetTokenIn(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8)
