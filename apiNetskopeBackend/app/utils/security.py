@@ -23,3 +23,18 @@ def decode_token(token: str) -> str | None:
         return payload.get("sub")
     except JWTError:
         return None
+
+#Reset token wioth forgot password
+def create_reset_token(subject: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.RESET_TOKEN_EXPIRE_MINUTES)
+    to_encode = {"sub": subject, "exp": expire, "scope": "pwd_reset"}
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
+
+def decode_reset_token(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("scope") != "pwd_reset":
+            return None
+        return payload.get("sub")
+    except JWTError:
+        return None
