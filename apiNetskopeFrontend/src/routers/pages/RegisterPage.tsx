@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { TextField, Button, Stack, Alert, Link } from "@mui/material";
+import { TextField, Button, Stack, Alert, Link, Card, CardContent } from "@mui/material";
 import { register } from "../../services/auth";
 import { useNavigate } from "react-router-dom";
 
@@ -26,6 +26,8 @@ export default function RegisterPage() {
   };
 
   return (
+    <Card elevation={3} sx={{ maxWidth: 600, mx: "auto", mt: 6, borderRadius: 3, width: "100%" }}>
+      <CardContent sx={{ p: 4 }}>
     <form onSubmit={onSubmit}>
       <Stack spacing={2}>
         <h2>Crear cuenta</h2>
@@ -39,5 +41,7 @@ export default function RegisterPage() {
         <Link href="/login">Volver a iniciar sesión</Link>
       </Stack>
     </form>
+    </CardContent>
+    </Card>
   );
 }

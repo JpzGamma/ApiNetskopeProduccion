@@ -7,7 +7,6 @@ export default function HomePage() {
     <Stack spacing={2}>
       <Typography variant="h5">Bienvenido 👋</Typography>
       <Typography>Autenticación correcta. Aquí montaremos los módulos por tenant.</Typography>
-      <Button variant="outlined" onClick={() => nav("/login")}>Ir al login</Button>
     </Stack>
   );
 }
