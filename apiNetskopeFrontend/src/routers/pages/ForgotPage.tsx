@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { TextField, Button, Stack, Alert, Link as MUILink } from "@mui/material";
+import { TextField, Button, Stack, Alert, Link as MUILink, Card, CardContent } from "@mui/material";
 import { forgot } from "../../services/auth";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 
@@ -32,6 +32,8 @@ export default function ForgotPage() {
   };
 
   return (
+    <Card elevation={3} sx={{ maxWidth: 400, mx: "auto", mt: 6, borderRadius: 3, width: "100%" }}>
+      <CardContent sx={{ p: 4 }}>
     <form onSubmit={onSubmit}>
       <Stack spacing={2}>
         <h2>¿Olvidaste tu contraseña?</h2>
@@ -52,5 +54,7 @@ export default function ForgotPage() {
         </MUILink>
       </Stack>
     </form>
+    </CardContent>
+    </Card>
   );
 }
