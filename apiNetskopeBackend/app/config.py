@@ -22,6 +22,13 @@ class Settings:
     MAIL_USERNAME: str = os.getenv("MAIL_USERNAME", "")
     MAIL_PASSWORD: str = os.getenv("MAIL_PASSWORD", "")
     RESET_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("RESET_TOKEN_EXPIRE_MINUTES", "15"))
+     # GAMMA
+    NETSKOPE_TENANT_GAMMA: str = os.getenv("NETSKOPE_TENANT_GAMMA", "")
+    NETSKOPE_TOKEN_GAMMA: str  = os.getenv("NETSKOPE_TOKEN_GAMMA", "")
+
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3005")
+
+    class Config:
+        env_file = ".env.dev" 
 
 settings = Settings()
