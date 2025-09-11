@@ -40,6 +40,19 @@ def list_url_lists(pending: Optional[int] = None, fields: Optional[str] = None) 
     return resp.json()
 
 
+def count_url_lists() -> int:
+    """Devuelve el número total de URL Lists."""
+    payload = list_url_lists()
+    if isinstance(payload, dict):
+        data = payload.get("data")
+        if isinstance(data, list):
+            return len(data)
+        return 0
+    if isinstance(payload, list):
+        return len(payload)
+    return 0
+
+
 def find_url_list_by_name(name: str) -> dict | None:
     """
     Devuelve el objeto de lista cuyo 'name' coincida exactamente (case-insensitive).
