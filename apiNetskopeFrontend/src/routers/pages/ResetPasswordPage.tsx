@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { TextField, Button, Stack, Alert, Box, Card, CardContent, Typography, InputAdornment } from "@mui/material";
 import { reset } from "../../services/auth";
-import { useSearchParams, useNavigate, useLocation, Link as RouterLink } from "react-router-dom";
+import { useSearchParams, useNavigate, Link as RouterLink } from "react-router-dom";
 import { Lock } from "@mui/icons-material"; // Importando el icono de Lock
 
 export default function ResetPasswordPage() {
   const [sp] = useSearchParams();
-  const location = useLocation() as { state?: { info?: string } };
   const [token, setToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
