@@ -4,6 +4,9 @@ from datetime import datetime, timezone
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth
 from app.routers import netskopeGammaRouter
+from app.routers import netskopeCCIRouter
+from app.routers import netskopeUsersRouter
+from app.routers import netskopeGroupsRouter
 from app.config import settings
 
 app = FastAPI(
@@ -14,6 +17,9 @@ app = FastAPI(
 
 app.include_router(auth.router)
 app.include_router(netskopeGammaRouter.router)
+app.include_router(netskopeCCIRouter.router)
+app.include_router(netskopeUsersRouter.router)
+app.include_router(netskopeGroupsRouter.router)
 
 
 app.add_middleware(

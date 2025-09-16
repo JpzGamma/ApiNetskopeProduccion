@@ -1,6 +1,5 @@
 from typing import Literal, Optional, List, Dict, Any
 from urllib.parse import urlparse
-
 from fastapi import APIRouter, HTTPException, Body, Query
 from pydantic import BaseModel, Field
 
@@ -11,7 +10,7 @@ from app.services.netskopeGammaService import (
     patch_url_list,
 )
 
-router = APIRouter(prefix="/Gamma", tags=["Gamma"])
+router = APIRouter(prefix="/Gamma", tags=["Gamma-URl_LIst"])
 
 
 # ---------- HOME ----------
@@ -144,26 +143,3 @@ def gamma_patch_url_lists_batch(
     }
 
 
-# ---------- PATCH POR ID (DEJAR DESPUÉS PARA NO COLISIONAR) ----------
-@router.patch(
-    "/url-lists/{list_id}/{action}",
-    summary="PATCH a una URL List por ID (append o replace)"
-)
-def gamma_patch_url_list_by_id(
-    list_id: int,
-    action: Literal["append", "replace"],
-    payload: UrlListPatchIn = Body(..., example={
-        "data": {
-            "type": "exact",
-            "urls": [
-                "www.google.com",
-                "youtube.com",
-                "netskope.com"
-            ]
-        }
-    }),
-):
-    try:
-        return patch_url_list(list_id, payload.model_dump(), action)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
