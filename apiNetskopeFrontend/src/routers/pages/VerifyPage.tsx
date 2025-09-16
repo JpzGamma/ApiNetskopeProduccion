@@ -1,44 +1,226 @@
-import { useState, useEffect } from "react";
-import { TextField, Button, Stack, Alert, Link } from "@mui/material";
-import { verify } from "../../services/auth";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from 'react';
+import {
+  TextField,
+  Button,
+  Stack,
+  Alert,
+  Link as MUILink,
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  InputAdornment,
+} from '@mui/material';
+import { verify } from '../../services/auth';
+import {
+  useSearchParams,
+  useNavigate,
+  Link as RouterLink,
+} from 'react-router-dom';
+import { Email, Lock } from '@mui/icons-material';
 
 export default function VerifyPage() {
   const [sp] = useSearchParams();
-  const [correo, setCorreo] = useState("");
-  const [codigo, setCodigo] = useState("");
+  const [correo, setCorreo] = useState('');
+  const [codigo, setCodigo] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const nav = useNavigate();
 
   useEffect(() => {
-    const q = sp.get("correo");
+    const q = sp.get('correo');
     if (q) setCorreo(q);
   }, [sp]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErr(null); setMsg(null);
+    setErr(null);
+    setMsg(null);
     try {
       const res = await verify({ correo, codigo });
       setMsg(res.message);
-      setTimeout(()=> nav("/login"), 800);
+      setTimeout(() => nav('/login'), 800);
     } catch (e: any) {
-      setErr(e?.response?.data?.detail || "Error al verificar");
+      setErr(e?.response?.data?.detail || 'Error al verificar');
     }
   };
 
   return (
-    <form onSubmit={onSubmit}>
-      <Stack spacing={2}>
-        <h2>Verificar cuenta</h2>
-        {msg && <Alert severity="success">{msg}</Alert>}
-        {err && <Alert severity="error">{err}</Alert>}
-        <TextField label="Correo" type="email" value={correo} onChange={(e)=>setCorreo(e.target.value)} required />
-        <TextField label="Código" value={codigo} onChange={(e)=>setCodigo(e.target.value)} required />
-        <Button variant="contained" type="submit">Verificar</Button>
-        <Link href="/login">Volver al login</Link>
-      </Stack>
-    </form>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background:
+          'linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)',
+        p: 2,
+        height: '100vh',
+      }}
+    >
+      {/* Fondo de cuadro */}
+      <Box
+        sx={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '40px',
+          background:
+            'linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)',
+          boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <Card
+          elevation={6}
+          sx={{
+            width: '100%',
+            maxWidth: 400,
+            borderRadius: 3,
+            boxShadow: '0px 10px 30px rgba(0,0,0,0.05)',
+          }}
+        >
+          <CardContent sx={{ p: 4 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Box
+                component="img"
+                src="/LogoNetskopeAzul.jpeg"
+                alt="Logo de seguridad"
+                sx={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: 6,
+                  boxShadow: '0 6px 12px rgba(0, 0, 0, 0.4)',
+                }}
+              />
+            </Box>
+
+            <Typography
+              variant="h6"
+              fontWeight={600}
+              align="center"
+              sx={{ mb: 1 }}
+            >
+              Verificar Correo
+            </Typography>
+            <Typography
+              variant="body2"
+              align="center"
+              color="text.secondary"
+              sx={{ mb: 3 }}
+            >
+              Ingresa el código enviado
+            </Typography>
+
+            <form onSubmit={onSubmit}>
+              {/* Hack para evitar autocompletado molesto */}
+              <input type="text" name="fakeuser" autoComplete="username" style={{ display: "none" }} />
+              <input type="password" name="fakepass" autoComplete="new-password" style={{ display: "none" }} />
+              <Stack spacing={2}>
+                {msg && <Alert severity="success">{msg}</Alert>}
+                {err && <Alert severity="error">{err}</Alert>}
+
+                {/* Correo */}
+                <TextField
+                  label="Correo electrónico"
+                  type="email"
+                  value={correo}
+                  onChange={(e) => setCorreo(e.target.value)}
+                  fullWidth
+                  autoComplete="off"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Email color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                {/* Código de verificación */}
+                <TextField
+                  label="Código de verificación"
+                  value={codigo}
+                  onChange={(e) => setCodigo(e.target.value)}
+                  fullWidth
+                  autoComplete="off"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Lock color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                {/* Enlace para reenviar código */}
+                <Typography variant="body2" align="center" sx={{ mt: 3 }}>
+                  ¿No recibiste el código?{' '}
+                  <MUILink component={RouterLink} to="/verify">
+                    Reenviar
+                  </MUILink>
+                </Typography>
+
+                <Button
+                  variant="contained"
+                  type="submit"
+                  fullWidth
+                  sx={{
+                    py: 1.3,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    backgroundColor: '#42a5f5',
+                    borderRadius: 2,
+                    ':hover': {
+                      backgroundColor: '#1e88e5',
+                    },
+                  }}
+                >
+                  Verificar y Crear Cuenta
+                </Button>
+
+                {/* Enlace para volver al login */}
+                <Box sx={{ textAlign: 'center', mt: 2 }}>
+                  <Button
+                    variant="outlined"
+                    component={RouterLink}
+                    to="/login"
+                    sx={{
+                      py: 1.3,
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      backgroundColor: '#ffffff',
+                      borderColor: '#42a5f5',
+                      color: '#42a5f5',
+                      borderRadius: 2,
+                      boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
+                      ':hover': {
+                        backgroundColor: '#e3f2fd',
+                        borderColor: '#1e88e5',
+                        color: '#1e88e5',
+                      },
+                    }}
+                  >
+                    Volver
+                  </Button>
+                </Box>
+              </Stack>
+            </form>
+          </CardContent>
+        </Card>
+      </Box>
+
+      {/* Copyright */}
+      <Box
+        sx={{
+          mt: 3,
+          color: 'text.secondary',
+          maxWidth: 400,
+          textAlign: 'center',
+        }}
+      >
+        <Typography variant="caption">
+          © {new Date().getFullYear()} ApiNetskope
+        </Typography>
+      </Box>
+    </Box>
   );
 }
