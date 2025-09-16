@@ -1,13 +1,22 @@
 import { useState } from "react";
 import {
-  TextField, Button, Stack, Alert, Link as MUILink,
-  Card, CardContent, Typography, Avatar, Box
+  TextField,
+  Button,
+  Stack,
+  Alert,
+  Link as MUILink,
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  InputAdornment,
 } from "@mui/material";
+import { Email, Lock } from "@mui/icons-material";
 import { login } from "../../services/auth";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 
 export default function LoginPage() {
-  const [correo, setCorreo] = useState(localStorage.getItem("remember_email") || "");
+  const [correo, setCorreo] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
@@ -15,55 +24,156 @@ export default function LoginPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
     try {
       await login({ correo, password });
+
       nav("/home");
     } catch (e: any) {
-      const detail = e?.response?.data?.detail || e?.response?.data?.message || "Error al iniciar sesión";
+      const detail =
+        e?.response?.data?.detail ||
+        e?.response?.data?.message ||
+        "Error al iniciar sesión";
       setError(detail);
     }
   };
 
   return (
-    <Card elevation={4} sx={{ width: "100%", maxWidth: 420, borderRadius: 3 }}>
-      <CardContent sx={{ p: 4 }}>
-        <Box sx={{ display: "flex", justifyContent: "center", mb: 1 }}>
-          {/* Coloca tu logo en /public/logo.png */}
-          <Avatar src="public/LogoNetskopeAzul.jpeg" alt="Logo" sx={{ width: 64, height: 64, boxShadow: 2 }} />
+    <Box
+      sx={{
+        display: "flex",
+        height: "100vh",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+        p: 2,
+      }}
+    >
+      {/* Main Container */}
+      <Box
+        sx={{
+          backgroundColor: "white",
+          borderRadius: "12px",
+          padding: "40px",
+          boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)",
+          background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+        }}
+      >
+        <Card
+          elevation={6}
+          sx={{
+            width: "100%",
+            maxWidth: 400,
+            borderRadius: 3,
+            boxShadow: "0px 10px 30px rgba(0,0,0,0.05)",
+          }}
+        >
+          <CardContent sx={{ p: 4 }}>
+            {/* Logo Section */}
+            <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+              <Box
+                component="img"
+                src="/LogoNetskopeAzul.jpeg"
+                alt="Logo de seguridad"
+                sx={{ width: 60, height: 60, borderRadius: 6, boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)" }}
+              />
+            </Box>
+
+            {/* Title */}
+            <Typography variant="h6" fontWeight={600} align="center" gutterBottom>
+              Iniciar Sesión
+            </Typography>
+            <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 3 }}>
+              ¡Bienvenidos!
+            </Typography>
+
+            {/* Login Form */}
+            <form onSubmit={onSubmit} autoComplete="off">
+              <div style={{ display: "none" }} aria-hidden>
+                <input name="prevent_autofill_username" autoComplete="username" />
+                <input name="prevent_autofill_password" type="password" autoComplete="current-password" />
+              </div>
+              <Stack spacing={2}>
+                {error && <Alert severity="error">{error}</Alert>}
+
+                {/* Email Field */}
+                <TextField
+                  label="Correo electrónico"
+                  type="email"
+                  value={correo}
+                  onChange={(e) => setCorreo(e.target.value)}
+                  fullWidth
+                  autoComplete="off"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Email color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                {/* Password Field */}
+                <TextField
+                  label="Contraseña"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  fullWidth
+                  autoComplete="off"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Lock color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                {/*  Forgot Password */}
+                <Box display="flex" justifyContent="space-between" alignItems="center">
+                  <MUILink component={RouterLink} to="/forgot" variant="body2">
+                    ¿Olvidaste tu contraseña?
+                  </MUILink>
+                </Box>
+
+                {/* Submit Button */}
+                <Button
+                  variant="contained"
+                  type="submit"
+                  fullWidth
+                  sx={{
+                    py: 1.3,
+                    fontWeight: 600,
+                    textTransform: "none",
+                    backgroundColor: "#42a5f5",
+                    borderRadius: 2,
+                    ":hover": {
+                      backgroundColor: "#1e88e5",
+                    },
+                  }}
+                >
+                  Iniciar Sesión
+                </Button>
+              </Stack>
+            </form>
+
+            {/* Registration Link */}
+            <Typography variant="body2" align="center" sx={{ mt: 3 }}>
+              ¿No tienes una cuenta?{" "}
+              <MUILink component={RouterLink} to="/register">
+                Regístrate aquí
+              </MUILink>
+            </Typography>
+          </CardContent>
+        </Card>
+
+        {/* Copyright */}
+        <Box sx={{ mt: 3, color: "text.secondary", maxWidth: 400, textAlign: "center" }}>
+          <Typography variant="caption">© {new Date().getFullYear()} ApiNetskope</Typography>
         </Box>
-
-        <Typography variant="h5" fontWeight={700} sx={{ mb: 2, textAlign: "center" }}>
-          Iniciar sesión
-        </Typography>
-
-        <form onSubmit={onSubmit}>
-          <Stack spacing={2}>
-            {error && <Alert severity="error">{error}</Alert>}
-            <TextField label="Correo" type="email" value={correo} onChange={(e)=>setCorreo(e.target.value)} required fullWidth />
-            <TextField label="Contraseña" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required fullWidth />
-            <Button
-              variant="contained"
-              type="submit"
-              fullWidth
-              sx={{
-                py: 1.2,
-                textTransform: "none",
-                fontWeight: 600,
-                backgroundImage: "linear-gradient(180deg, #ff7a2a 0%, #f25c05 100%)",
-                ":hover": {
-                  backgroundImage: "linear-gradient(180deg, #ff7a2a 0%, #d94f04 100%)",
-                },
-              }}
-            >
-              Entrar
-            </Button>
-            <Stack direction="row" justifyContent="space-between">
-              <MUILink component={RouterLink} to="/register">Crear cuenta</MUILink>
-              <MUILink component={RouterLink} to="/forgot">¿Olvidaste tu contraseña?</MUILink>
-            </Stack>
-          </Stack>
-        </form>
-      </CardContent>
-    </Card>
+      </Box>
+    </Box>
   );
 }
