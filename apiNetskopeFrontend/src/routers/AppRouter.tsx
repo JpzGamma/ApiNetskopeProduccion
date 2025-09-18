@@ -9,6 +9,10 @@ import ForgotPage from "./pages/ForgotPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import HomePage from "./pages/HomePage";
 import WelcomePage from "./pages/WelcomePage";
+import CciApps from "./pages/cciApps";
+import URL_List from "./pages/URL_List";      
+import Users from "./pages/Users"
+import Groups from "./pages/Groups";
 
 export default function AppRouter() {
   return (
@@ -22,6 +26,10 @@ export default function AppRouter() {
           <Route path="/forgot" element={<ForgotPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/welcome" element={<WelcomePage />} /> {}
+          <Route path="/cciApps" element={<CciApps />} />
+          <Route path="/URL_List" element={<URL_List />} />
+          <Route path="/Users" element={<Users/>} />
+          <Route path="/Groups" element={<Groups/>} />
           <Route element={<ProtectedRoute />}>
             <Route path="/home" element={<HomePage />} />
           </Route>
