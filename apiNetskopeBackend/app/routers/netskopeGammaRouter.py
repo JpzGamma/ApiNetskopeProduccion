@@ -8,6 +8,7 @@ from app.services.netskopeGammaService import (
     count_url_lists,
     find_url_list_by_name,
     patch_url_list,
+    deploy_url_lists,   # <-- nuevo
 )
 
 router = APIRouter(prefix="/Gamma", tags=["Gamma-URl_LIst"])
@@ -25,7 +26,7 @@ def gamma_home():
     }
 
 
-# ---------- MODELOS EXISTENTES ----------
+# ---------- MODELOS ----------
 class UrlListDataIn(BaseModel):
     type: Literal["exact", "regex", "wildcard"] = Field(default="exact")
     urls: list[str] = Field(default_factory=list)
@@ -58,7 +59,7 @@ def gamma_count_url_lists():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ========== PATCH MASIVO (DECLARADO ANTES DEL POR ID) ==========
+# ---------- PATCH MASIVO ----------
 def _to_host(u: str) -> Optional[str]:
     if not isinstance(u, str):
         return None
@@ -82,6 +83,7 @@ def gamma_patch_url_lists_batch(
         "youtube.com",
         "netskope.com"
     ]),
+    deploy: bool = Query(False, description="Si true, aplica /policy/urllist/deploy al final"),
 ):
     if not ids and not names:
         raise HTTPException(status_code=400, detail="Debes enviar al menos 'ids' o 'names'")
@@ -134,7 +136,7 @@ def gamma_patch_url_lists_batch(
         except Exception as e:
             results.append({"id": lid, "status": "error", "error": str(e)})
 
-    return {
+    out: Dict[str, Any] = {
         "action": action,
         "targets": sorted(target_ids),
         "not_found_names": not_found_names,
@@ -142,4 +144,23 @@ def gamma_patch_url_lists_batch(
         "results": results,
     }
 
+    # Deploy opcional
+    if deploy:
+        try:
+            out["deploy"] = deploy_url_lists()
+        except Exception as e:
+            out["deploy_error"] = str(e)
 
+    return out
+
+
+# ---------- DEPLOY explícito ----------
+@router.post(
+    "/url-lists/deploy",
+    summary="Aplica todos los cambios pendientes de URL Lists (Netskope /policy/urllist/deploy)"
+)
+def gamma_deploy_url_lists():
+    try:
+        return deploy_url_lists()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

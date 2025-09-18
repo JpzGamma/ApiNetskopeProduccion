@@ -1,12 +1,12 @@
 import requests
-from typing import Literal, Optional
+from typing import Literal, Optional, List, Dict, Any
+from urllib.parse import urlparse
 from app.config import settings
 
 
 def _base_headers() -> dict:
     if not settings.NETSKOPE_TENANT_GAMMA:
         raise RuntimeError("NETSKOPE_TENANT_GAMMA no definido en .env")
-
     if not settings.NETSKOPE_TOKEN_GAMMA:
         raise RuntimeError("NETSKOPE_TOKEN_GAMMA no definido en .env")
 
@@ -17,6 +17,12 @@ def _base_headers() -> dict:
     }
 
 
+def _tenant_base() -> str:
+    return settings.NETSKOPE_TENANT_GAMMA.rstrip("/")
+
+
+# -------------------- Listados --------------------
+
 def list_url_lists(pending: Optional[int] = None, fields: Optional[str] = None) -> dict | list:
     """
     GET /api/v2/policy/urllist
@@ -26,8 +32,7 @@ def list_url_lists(pending: Optional[int] = None, fields: Optional[str] = None) 
       - dict con clave 'data' -> lista de objetos
       - lista plana de objetos
     """
-    base = settings.NETSKOPE_TENANT_GAMMA.rstrip("/")
-    url = f"{base}/api/v2/policy/urllist"
+    url = f"{_tenant_base()}/api/v2/policy/urllist"
     params = {}
     if pending in (0, 1):
         params["pending"] = pending
@@ -78,6 +83,8 @@ def find_url_list_by_name(name: str) -> dict | None:
     return None
 
 
+# -------------------- PATCH (append/replace) --------------------
+
 def patch_url_list(
     list_id: int,
     payload: dict,
@@ -91,8 +98,7 @@ def patch_url_list(
       "name": "string" (opcional)
     }
     """
-    base = settings.NETSKOPE_TENANT_GAMMA.rstrip("/")
-    url = f"{base}/api/v2/policy/urllist/{list_id}/{action}"
+    url = f"{_tenant_base()}/api/v2/policy/urllist/{list_id}/{action}"
 
     # Normaliza: quitar duplicados/minusculizar hosts si llega 'data.urls'
     if "data" in payload and isinstance(payload["data"], dict):
@@ -116,3 +122,17 @@ def patch_url_list(
     if resp.status_code not in (200, 201, 202):
         raise Exception(f"Error {resp.status_code} al hacer PATCH de URL List: {resp.text}")
     return resp.json()
+
+
+# -------------------- Deploy (nuevo) --------------------
+
+def deploy_url_lists() -> dict | list:
+    """
+    POST /api/v2/policy/urllist/deploy
+    Aplica TODOS los cambios pendientes de URL Lists.
+    """
+    url = f"{_tenant_base()}/api/v2/policy/urllist/deploy"
+    resp = requests.post(url, headers=_base_headers(), timeout=60)
+    if resp.status_code != 200:
+        raise Exception(f"Error {resp.status_code} al hacer deploy de URL Lists: {resp.text}")
+    return resp.json() if resp.text else {}
