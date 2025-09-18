@@ -17,14 +17,14 @@ import {
   InputAdornment,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom'; // <-- Importa useNavigate
 
 // Datos de tenants con links externos
 const tenants = [
-  { name: 'URL - List', route: 'https://example1.com' },
-  { name: 'CCI - Apps', route: 'https://gammaingenieros-co.goskope.com/' },
-  { name: 'Usuarios', route: 'https://example3.com' },
-  { name: 'Grupos', route: 'https://example4.com' },
+  { name: 'URL - List', route: '/URL_List' },
+  { name: 'CCI - Apps', route: '/cciApps' },
+  { name: 'Usuarios', route: '/Users' },
+  { name: 'Grupos', route: '/Groups' },
   { name: 'Políticas Real - Time', route: 'https://example5.com' },
   { name: 'NPA - Private Apps', route: 'https://example6.com' },
   { name: 'Eventos - SWG', route: 'https://example4.com' },
@@ -55,15 +55,18 @@ export default function Homepage() {
     t.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const navigate = useNavigate(); // <-- Aquí inicializo navigate
+
   return (
     <Box
       sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)',
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
         p: 2,
+        background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
       }}
     >
       {/* Cuadro central */}
@@ -80,7 +83,7 @@ export default function Homepage() {
           elevation={6}
           sx={{
             width: '100%',
-            maxWidth: 800, // Ajustamos el tamaño de los cajones
+            maxWidth: 800,
             borderRadius: 3,
             padding: '20px',
             background: 'transparent',
@@ -96,10 +99,12 @@ export default function Homepage() {
                 src="/LogoNetskopeAzul.jpeg"
                 alt="Logo"
                 sx={{
-                  width: 80,
-                  height: 80,
+                  width: 70,
+                  height: 70,
                   borderRadius: 6,
-                  boxShadow: '0 6px 12px rgba(0, 0, 0, 0.4)',
+                  boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                  mb: 2,
+                  mx: "auto",
                 }}
               />
             </Box>
@@ -185,7 +190,13 @@ export default function Homepage() {
                         padding: '20px',
                         cursor: 'pointer',
                       }}
-                      onClick={() => window.open(tenant.route, '_blank')}
+                      onClick={() => {
+                        if (tenant.route.startsWith('http')) {
+                          window.open(tenant.route, '_blank');
+                        } else {
+                          navigate(tenant.route);
+                        }
+                      }}
                     >
                       <Typography
                         variant="h6"
