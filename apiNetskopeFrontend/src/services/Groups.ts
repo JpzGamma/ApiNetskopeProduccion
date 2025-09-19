@@ -1,37 +1,41 @@
+import api from "./api";
+
 export type GroupType = {
   id: string;
   displayName: string;
   members?: { value: string; display: string }[];
 };
 
-const BASE_URL = "http://localhost:8001/Gamma/groups";
+const BASE = "/Gamma/groups";
 
+/** GET /Gamma/groups */
 export async function fetchGroupsService(): Promise<GroupType[]> {
-  const res = await fetch(BASE_URL);
-  if (!res.ok) throw new Error("Error cargando grupos");
-  const data = await res.json();
+  const { data } = await api.get<any>(BASE);
 
-  return data.Resources.map((g: any) => ({
+  // Mantiene el mapeo que ya usabas
+  return (data.Resources || []).map((g: any) => ({
     id: g.id,
     displayName: g.displayName,
     members: g.members || [],
   }));
 }
 
-export async function createGroupService(displayName: string, members: string[]) {
+/** POST /Gamma/groups?group_name=...&members=a&members=b */
+export async function createGroupService(
+  displayName: string,
+  members: string[]
+) {
   const params = new URLSearchParams();
   params.append("group_name", displayName);
+  members
+    .map((m) => m.trim())
+    .filter(Boolean)
+    .forEach((m) => params.append("members", m));
 
-  if (members.length > 0) {
-    members.forEach((m) => params.append("members", m.trim()));
-  }
-
-  const res = await fetch(`${BASE_URL}?${params.toString()}`, {
-    method: "POST",
-  });
-  if (!res.ok) throw new Error("Error creando grupo");
+  await api.post(`${BASE}?${params.toString()}`);
 }
 
+/** PATCH /Gamma/groups/patch?... */
 export async function updateGroupService(
   id: string | undefined,
   displayName: string,
@@ -45,27 +49,24 @@ export async function updateGroupService(
 
   if (newDisplayName) params.append("new_display_name", newDisplayName);
 
-  if (addMembers.length > 0) {
-    addMembers.forEach((m) => params.append("add_members", m.trim()));
-  }
+  addMembers
+    .map((m) => m.trim())
+    .filter(Boolean)
+    .forEach((m) => params.append("add_members", m));
 
-  if (removeMembers.length > 0) {
-    removeMembers.forEach((m) => params.append("remove_members", m.trim()));
-  }
+  removeMembers
+    .map((m) => m.trim())
+    .filter(Boolean)
+    .forEach((m) => params.append("remove_members", m));
 
-  const res = await fetch(`${BASE_URL}/patch?${params.toString()}`, {
-    method: "PATCH",
-  });
-  if (!res.ok) throw new Error("Error actualizando grupo");
+  await api.patch(`${BASE}/patch?${params.toString()}`);
 }
 
+/** DELETE /Gamma/groups?group_id=... | name=... */
 export async function deleteGroupService(group: GroupType) {
   const params = new URLSearchParams();
   if (group.id) params.append("group_id", group.id);
   else params.append("name", group.displayName);
 
-  const res = await fetch(`${BASE_URL}?${params.toString()}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) throw new Error("Error eliminando grupo");
+  await api.delete(`${BASE}?${params.toString()}`);
 }

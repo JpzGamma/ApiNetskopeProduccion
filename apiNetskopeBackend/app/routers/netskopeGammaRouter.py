@@ -1,46 +1,42 @@
 from typing import Literal, Optional, List, Dict, Any
-from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Body, Query
 from pydantic import BaseModel, Field
 
 from app.services.netskopeGammaService import (
-    list_url_lists,
-    count_url_lists,
-    find_url_list_by_name,
-    patch_url_list,
-    deploy_url_lists,
-    delete_url_list_by_id,     # <-- nuevo
-    delete_url_list_by_name,   # <-- nuevo
+    list_url_lists, count_url_lists, find_url_list_by_name,
+    patch_url_list, deploy_url_lists, delete_url_list_by_id,
+    delete_url_list_by_name, bucketize_urls, get_url_list_type,
+    create_url_list,
 )
 
-router = APIRouter(prefix="/Gamma", tags=["Gamma-URl_LIst"])
-
+router = APIRouter(prefix="/Gamma", tags=["Gamma-URL_List"])
 
 # ---------- HOME ----------
 @router.get("/home", summary="Pantalla inicial de Gamma (sin auth)")
 def gamma_home():
     return {
         "tenant": "Gamma",
-        "modules": [
-            {"key": "url-list", "name": "URL Lists", "path": "/Gamma/url-lists"},
-        ],
+        "modules": [{"key": "url-list", "name": "URL Lists", "path": "/Gamma/url-lists"}],
         "notes": "Desde aquí el front pinta tarjetas para cada módulo.",
     }
 
-
 # ---------- MODELOS ----------
 class UrlListDataIn(BaseModel):
-    type: Literal["exact", "regex", "wildcard"] = Field(default="exact")
+    type: Literal["exact", "regex"] = Field(default="exact")
     urls: list[str] = Field(default_factory=list)
 
 class UrlListPatchIn(BaseModel):
     data: UrlListDataIn
     name: Optional[str] = Field(default=None, description="Nombre a mantener/actualizar (opcional)")
 
+class UrlListCreateIn(BaseModel):
+    name: str = Field(..., min_length=1)
+    urls: List[str] = Field(..., description="Listado (no puede ser vacío luego de validar)")
+    allow_regex: bool = Field(False, description="Si hay regex, se creará la lista como 'regex'")
 
 # ---------- LISTAR / CONTAR ----------
 @router.get("/url-lists", summary="Lista de URL Lists (opcional: filtrar por nombre)")
-def gamma_list_url_lists(name: Optional[str] = Query(default=None, description="Nombre exacto, p.ej. [Semillero] AllowList")):
+def gamma_list_url_lists(name: Optional[str] = Query(default=None, description="Nombre exacto")):
     try:
         if name:
             item = find_url_list_by_name(name)
@@ -60,48 +56,42 @@ def gamma_count_url_lists():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ---------- CREAR (deploy siempre) ----------
+@router.post("/url-lists", summary="Crea una URL List (no vacía). Detecta tipo (regex/exact) y hace deploy.")
+def gamma_create_url_list(payload: UrlListCreateIn):
+    try:
+        created_info = create_url_list(payload.name, payload.urls, allow_regex=payload.allow_regex)
+        out: Dict[str, Any] = {"create": created_info}
+        try:
+            out["deploy"] = deploy_url_lists()
+        except Exception as e:
+            out["deploy_error"] = str(e)
+        return out
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-# ---------- PATCH MASIVO ----------
-def _to_host(u: str) -> Optional[str]:
-    if not isinstance(u, str):
-        return None
-    s = u.strip()
-    if not s:
-        return None
-    parsed = urlparse(s if "://" in s else f"http://{s}")
-    host = parsed.hostname or s
-    return host.lower().strip() if host else None
-
+# ---------- PATCH MASIVO (deploy siempre) ----------
 @router.patch(
     "/url-lists/_batch/{action}",
-    summary="PATCH masivo a URL Lists por IDs y/o Nombres (body = lista de URLs, sin JSON anidado)"
+    summary="Carga masiva autodetectando exact (incluye wildcard) y regex (opcional). Deploy automático."
 )
 def gamma_patch_url_lists_batch(
     action: Literal["append", "replace"],
-    ids: Optional[str] = Query(None, description="IDs separados por coma. Ej: 77,79"),
-    names: Optional[str] = Query(None, description="Nombres separados por coma. Ej: [Semillero] AllowList,Lista Demo"),
-    urls: List[str] = Body(..., example=[
-        "www.google.com",
-        "youtube.com",
-        "netskope.com"
-    ]),
-    deploy: bool = Query(False, description="Si true, aplica /policy/urllist/deploy al final"),
+    ids: Optional[str] = Query(None, description="IDs separados por coma"),
+    names: Optional[str] = Query(None, description="Nombres separados por coma"),
+    allow_regex: bool = Query(False, description="Tratar entradas regex"),
+    urls: List[str] = Body(...),
 ):
     if not ids and not names:
         raise HTTPException(status_code=400, detail="Debes enviar al menos 'ids' o 'names'")
 
-    hosts: list[str] = []
-    seen = set()
-    for u in urls or []:
-        h = _to_host(u)
-        if h and h not in seen:
-            seen.add(h)
-            hosts.append(h)
-    if not hosts:
-        raise HTTPException(status_code=422, detail="No hay URLs válidas para enviar")
+    buckets = bucketize_urls(urls, allow_regex=allow_regex)
+    if not buckets["exact"] and not buckets["wildcard"] and not buckets["regex"]:
+        raise HTTPException(status_code=422, detail="No hay URLs válidas para enviar (todas rechazadas).")
 
     target_ids: set[int] = set()
-
     if ids:
         try:
             for part in ids.split(","):
@@ -109,99 +99,99 @@ def gamma_patch_url_lists_batch(
                 if part:
                     target_ids.add(int(part))
         except ValueError:
-            raise HTTPException(status_code=400, detail="Formato de 'ids' inválido. Usa enteros separados por coma.")
-
+            raise HTTPException(status_code=400, detail="Formato de 'ids' inválido.")
     not_found_names: list[str] = []
     if names:
         for raw_name in names.split(","):
-            name = raw_name.strip()
-            if not name:
+            nm = raw_name.strip()
+            if not nm:
                 continue
-            item = find_url_list_by_name(name)
+            item = find_url_list_by_name(nm)
             if item and "id" in item:
                 target_ids.add(int(item["id"]))
             else:
-                not_found_names.append(name)
-
+                not_found_names.append(nm)
     if not target_ids:
-        raise HTTPException(status_code=404, detail="No se resolvió ningún ID a partir de 'ids' y/o 'names'")
+        raise HTTPException(status_code=404, detail="No se resolvió ningún ID.")
 
-    payload = {"data": {"type": "exact", "urls": hosts}}
-
+    exact_like = (buckets["exact"] or []) + (buckets["wildcard"] or [])
     results: list[Dict[str, Any]] = []
     for lid in sorted(target_ids):
         try:
-            res = patch_url_list(list_id=lid, payload=payload, action=action)
-            results.append({"id": lid, "status": "ok", "sent": len(hosts), "result": res})
-        except Exception as e:
-            results.append({"id": lid, "status": "error", "error": str(e)})
+            list_type = get_url_list_type(lid)
+        except Exception:
+            list_type = "exact"
+
+        if list_type == "regex":
+            if allow_regex and buckets["regex"]:
+                try:
+                    res = patch_url_list(lid, {"data": {"type": "regex", "urls": buckets["regex"]}}, action)
+                    results.append({"id": lid, "type": "regex", "status": "ok", "sent": len(buckets["regex"]), "result": res})
+                except Exception as e:
+                    results.append({"id": lid, "type": "regex", "status": "error", "error": str(e)})
+            else:
+                results.append({"id": lid, "type": "regex", "status": "skipped", "reason": "no regex entries"})
+        else:
+            if exact_like:
+                try:
+                    res = patch_url_list(lid, {"data": {"type": "exact", "urls": exact_like}}, action)
+                    results.append({"id": lid, "type": "exact", "status": "ok", "sent": len(exact_like), "result": res})
+                except Exception as e:
+                    results.append({"id": lid, "type": "exact", "status": "error", "error": str(e)})
+            else:
+                results.append({"id": lid, "type": "exact", "status": "skipped", "reason": "no exact/wildcard entries"})
 
     out: Dict[str, Any] = {
         "action": action,
         "targets": sorted(target_ids),
         "not_found_names": not_found_names,
-        "sent_urls": hosts,
+        "accepted": {
+            "exact": buckets["exact"],
+            "wildcard_as_exact": buckets["wildcard"],
+            "regex": buckets["regex"] if allow_regex else [],
+        },
+        "rejected": buckets["rejected"],
         "results": results,
     }
-
-    if deploy:
-        try:
-            out["deploy"] = deploy_url_lists()
-        except Exception as e:
-            out["deploy_error"] = str(e)
-
+    try:
+        out["deploy"] = deploy_url_lists()
+    except Exception as e:
+        out["deploy_error"] = str(e)
     return out
 
-
 # ---------- DEPLOY explícito ----------
-@router.post(
-    "/url-lists/deploy",
-    summary="Aplica todos los cambios pendientes de URL Lists (Netskope /policy/urllist/deploy)"
-)
+@router.post("/url-lists/deploy", summary="Aplica todos los cambios pendientes")
 def gamma_deploy_url_lists():
     try:
         return deploy_url_lists()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ---------- DELETE (nuevo) ----------
-
-@router.delete(
-    "/url-lists/by-name",
-    summary="Elimina una URL List por nombre exacto"
-)
-def gamma_delete_url_list_by_name(name: str = Query(..., description="Nombre exacto de la URL List"),
-                                  deploy: bool = Query(False, description="Aplicar deploy luego de eliminar")):
+# ---------- DELETE (deploy siempre) ----------
+@router.delete("/url-lists/by-name", summary="Elimina una URL List por nombre exacto. Deploy automático.")
+def gamma_delete_url_list_by_name_endpoint(name: str = Query(..., description="Nombre exacto")):
     try:
         result = delete_url_list_by_name(name)
         out: Dict[str, Any] = {"deleted": result}
-        if deploy:
-            try:
-                out["deploy"] = deploy_url_lists()
-            except Exception as e:
-                out["deploy_error"] = str(e)
+        try:
+            out["deploy"] = deploy_url_lists()
+        except Exception as e:
+            out["deploy_error"] = str(e)
         return out
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete(
-    "/url-lists/{list_id}",
-    summary="Elimina una URL List por ID (queda 'pending' hasta deploy)"
-)
-def gamma_delete_url_list_by_id(list_id: int, deploy: bool = Query(False, description="Aplicar deploy luego de eliminar")):
+@router.delete("/url-lists/{list_id}", summary="Elimina una URL List por ID. Deploy automático.")
+def gamma_delete_url_list_by_id_endpoint(list_id: int):
     try:
         result = delete_url_list_by_id(list_id)
         out: Dict[str, Any] = {"deleted": result}
-        if deploy:
-            try:
-                out["deploy"] = deploy_url_lists()
-            except Exception as e:
-                out["deploy_error"] = str(e)
+        try:
+            out["deploy"] = deploy_url_lists()
+        except Exception as e:
+            out["deploy_error"] = str(e)
         return out
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
