@@ -1,9 +1,10 @@
+import re
 import requests
-from typing import Literal, Optional, List, Dict, Any
+from typing import Literal, Optional, List, Dict, Any, Tuple
 from urllib.parse import urlparse
 from app.config import settings
 
-
+# -------------------- Auth / base --------------------
 def _base_headers() -> dict:
     if not settings.NETSKOPE_TENANT_GAMMA:
         raise RuntimeError("NETSKOPE_TENANT_GAMMA no definido en .env")
@@ -18,21 +19,106 @@ def _base_headers() -> dict:
 def _tenant_base() -> str:
     return settings.NETSKOPE_TENANT_GAMMA.rstrip("/")
 
+# -------------------- Normalización / validación --------------------
+_ipv4_re = re.compile(r"^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$")
 
-# -------------------- Listados --------------------
+def _split_netloc_and_path(s: str) -> Tuple[str, str]:
+    p = urlparse(s if "://" in s else f"http://{s}")
+    host = (p.hostname or "").lower()
+    netloc = host
+    if p.port:
+        netloc = f"{host}:{p.port}"
+    path = p.path or ""
+    if path == "/":
+        path = ""
+    return netloc, path
 
+def _is_valid_host_or_ip(netloc: str) -> bool:
+    if not netloc:
+        return False
+    host_only = netloc.split(":")[0]
+    if host_only == "localhost":
+        return False
+    if _ipv4_re.match(host_only):
+        return True
+    return "." in host_only
+
+def _is_valid_wildcard(entry: str) -> bool:
+    """
+    Acepta patrones comunes:
+      '*.example.com', 'example.com/*', '*.example.com/*'
+    """
+    e = entry.lower().strip()
+    if not e:
+        return False
+
+    if "/" in e:
+        netloc, path = e.split("/", 1)
+        path = "/" + path if path and not path.startswith("/") else path
+    else:
+        netloc, path = e, ""
+
+    if netloc.startswith("*."):
+        base = netloc[2:]
+        if not _is_valid_host_or_ip(base):
+            return False
+    else:
+        if "*" in netloc:
+            return False
+        if not _is_valid_host_or_ip(netloc):
+            return False
+
+    if "*" in path and not path.endswith("/*"):
+        return False
+    return True
+
+def _normalize_exact(s: str) -> Optional[str]:
+    if "*" in s:
+        return None
+    netloc, path = _split_netloc_and_path(s)
+    if not _is_valid_host_or_ip(netloc):
+        return None
+    return f"{netloc}{path}".lower()
+
+def bucketize_urls(urls: List[str], *, allow_regex: bool = False) -> Dict[str, List[str]]:
+    out: Dict[str, List[str]] = {"exact": [], "wildcard": [], "regex": [], "rejected": []}
+    seen_exact, seen_wild, seen_regex = set(), set(), set()
+
+    for raw in urls or []:
+        if not isinstance(raw, str):
+            out["rejected"].append(str(raw)); continue
+        s = raw.strip()
+        if not s:
+            out["rejected"].append(raw); continue
+
+        is_regex_candidate = allow_regex and any(ch in s for ch in r".*+?[](){}|^$\\")
+        if is_regex_candidate:
+            if s not in seen_regex:
+                seen_regex.add(s); out["regex"].append(s)
+            continue
+
+        if "*" in s:
+            cand = s.lower()
+            if _is_valid_wildcard(cand):
+                if cand not in seen_wild:
+                    seen_wild.add(cand); out["wildcard"].append(cand)
+            else:
+                out["rejected"].append(raw)
+        else:
+            norm = _normalize_exact(s)
+            if norm:
+                if norm not in seen_exact:
+                    seen_exact.add(norm); out["exact"].append(norm)
+            else:
+                out["rejected"].append(raw)
+    return out
+
+# -------------------- Lecturas --------------------
 def list_url_lists(pending: Optional[int] = None, fields: Optional[str] = None) -> dict | list:
-    """
-    GET /api/v2/policy/urllist
-    pending: 0 applied / 1 pending / None => todos
-    fields: 'id,name,data,modify_type,modify_time,modify_by,pending'
-    """
     url = f"{_tenant_base()}/api/v2/policy/urllist"
     params = {}
-    if pending in (0, 1):
-        params["pending"] = pending
-    if fields:
-        params["field"] = fields
+    if pending in (0, 1): params["pending"] = pending
+    if fields: params["field"] = fields
     resp = requests.get(url, headers=_base_headers(), params=params, timeout=20)
     if resp.status_code != 200:
         raise Exception(f"Error {resp.status_code} al consultar URL Lists: {resp.text}")
@@ -48,89 +134,86 @@ def count_url_lists() -> int:
     return 0
 
 def find_url_list_by_name(name: str) -> dict | None:
-    """
-    Devuelve el objeto con 'name' exacto (case-insensitive).
-    Soporta payload {'data': [...]} o lista plana.
-    """
     payload = list_url_lists()
-    if isinstance(payload, dict):
-        items = payload.get("data", []) or []
-    elif isinstance(payload, list):
-        items = payload
-    else:
-        items = []
+    items = payload.get("data", []) if isinstance(payload, dict) else (payload if isinstance(payload, list) else [])
     target = name.strip().lower()
     for item in items:
         if isinstance(item, dict) and str(item.get("name", "")).strip().lower() == target:
             return item
     return None
 
+def get_url_list(list_id: int) -> dict:
+    url = f"{_tenant_base()}/api/v2/policy/urllist/{list_id}"
+    resp = requests.get(url, headers=_base_headers(), timeout=20)
+    if resp.status_code != 200:
+        raise Exception(f"Error {resp.status_code} leyendo URL List {list_id}: {resp.text}")
+    return resp.json()
 
-# -------------------- PATCH (append/replace) --------------------
+def get_url_list_type(list_id: int) -> str:
+    obj = get_url_list(list_id)
+    return (obj.get("data") or {}).get("type", "exact")
 
-def patch_url_list(
-    list_id: int,
-    payload: dict,
-    action: Literal["append", "replace"] = "append",
-) -> dict:
+# -------------------- Crear --------------------
+def create_url_list(name: str, urls: List[str], *, allow_regex: bool = False) -> dict:
     """
-    PATCH /api/v2/policy/urllist/{id}/{action}
-    payload:
-      {"data": {"type": "exact|regex|wildcard", "urls": [...]}, "name": "string?"}
+    POST /api/v2/policy/urllist
+    - No se permite crear vacías.
+    - Si allow_regex y hay regex válidas => se crea como 'regex'
+      de lo contrario se crea como 'exact' (exact + wildcard).
     """
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("El nombre es requerido.")
+
+    buckets = bucketize_urls(urls, allow_regex=allow_regex)
+    exact_like = (buckets["exact"] or []) + (buckets["wildcard"] or [])
+    use_regex = allow_regex and len(buckets["regex"]) > 0
+
+    if use_regex:
+        chosen_type, chosen_urls = "regex", buckets["regex"]
+    else:
+        chosen_type, chosen_urls = "exact", exact_like
+
+    if not chosen_urls:
+        raise ValueError("Debes enviar al menos una URL válida para crear la lista.")
+
+    url = f"{_tenant_base()}/api/v2/policy/urllist"
+    payload = {"name": name.strip(), "data": {"type": chosen_type, "urls": chosen_urls}}
+    resp = requests.post(url, headers=_base_headers(), json=payload, timeout=30)
+    if resp.status_code not in (200, 201):
+        raise Exception(f"Error {resp.status_code} al crear URL List: {resp.text}")
+    return {
+        "created": resp.json(),
+        "accepted": {"exact": buckets["exact"], "wildcard_as_exact": buckets["wildcard"], "regex": buckets["regex"] if allow_regex else []},
+        "rejected": buckets["rejected"],
+        "type_used": chosen_type,
+        "sent": len(chosen_urls),
+    }
+
+# -------------------- PATCH --------------------
+def patch_url_list(list_id: int, payload: dict, action: Literal["append", "replace"] = "append") -> dict:
     url = f"{_tenant_base()}/api/v2/policy/urllist/{list_id}/{action}"
-    if "data" in payload and isinstance(payload["data"], dict):
-        urls = payload["data"].get("urls", [])
-        if isinstance(urls, list):
-            norm, seen = [], set()
-            for u in urls:
-                if not isinstance(u, str):
-                    continue
-                v = u.strip()
-                if not v:
-                    continue
-                v2 = v.lower()
-                if v2 not in seen:
-                    seen.add(v2)
-                    norm.append(v)
-            payload["data"]["urls"] = norm
     resp = requests.patch(url, headers=_base_headers(), json=payload, timeout=30)
     if resp.status_code not in (200, 201, 202):
         raise Exception(f"Error {resp.status_code} al hacer PATCH de URL List: {resp.text}")
     return resp.json()
 
-
-# -------------------- Deploy --------------------
-
+# -------------------- Deploy (siempre) --------------------
 def deploy_url_lists() -> dict | list:
-    """
-    POST /api/v2/policy/urllist/deploy  — aplica TODOS los cambios pendientes.
-    """
     url = f"{_tenant_base()}/api/v2/policy/urllist/deploy"
     resp = requests.post(url, headers=_base_headers(), timeout=60)
     if resp.status_code != 200:
         raise Exception(f"Error {resp.status_code} al hacer deploy de URL Lists: {resp.text}")
     return resp.json() if resp.text else {}
 
-
-# -------------------- Delete (nuevo) --------------------
-
+# -------------------- Delete --------------------
 def delete_url_list_by_id(list_id: int) -> dict | None:
-    """
-    DELETE /api/v2/policy/urllist/{id}
-    Marca la URL List para eliminación (queda 'pending' hasta deploy).
-    """
     url = f"{_tenant_base()}/api/v2/policy/urllist/{list_id}"
     resp = requests.delete(url, headers=_base_headers(), timeout=30)
-    # API suele devolver 200 con el objeto o 202/204 según tenant
     if resp.status_code not in (200, 202, 204):
         raise Exception(f"Error {resp.status_code} al eliminar URL List {list_id}: {resp.text}")
     return resp.json() if resp.text else {"status": resp.status_code, "id": list_id}
 
 def delete_url_list_by_name(name: str) -> dict | None:
-    """
-    Helper: resuelve ID por nombre y llama a delete_url_list_by_id.
-    """
     item = find_url_list_by_name(name)
     if not item or "id" not in item:
         raise LookupError(f"No se encontró la URL List con nombre '{name}'")

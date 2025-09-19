@@ -66,8 +66,11 @@ export default function Users() {
     try {
       const data = await fetchUsers();
       setUsers(data);
-    } catch {
-      setFeedbackMsg({ type: "error", message: "Error cargando usuarios." });
+    } catch (e: any) {
+      setFeedbackMsg({
+        type: "error",
+        message: e?.message || "Error cargando usuarios.",
+      });
     } finally {
       setLoading(false);
     }
@@ -92,7 +95,13 @@ export default function Users() {
     setOpenModal(true);
   };
 
-  const handleCloseModal = () => setOpenModal(false);
+  const handleCloseModal = () => {
+    setOpenModal(false);
+    // limpiar feedback del modal para la siguiente vez
+    setTimeout(() => {
+      setFeedbackMsg({ type: null, message: "" });
+    }, 0);
+  };
 
   const handleSubmit = async () => {
     setFeedbackMsg({ type: null, message: "" });
@@ -107,9 +116,12 @@ export default function Users() {
         setFeedbackMsg({ type: "success", message: "Usuario creado con éxito" });
       }
       handleCloseModal();
-      loadUsers();
-    } catch {
-      setFeedbackMsg({ type: "error", message: "Error en la operación." });
+      await loadUsers();
+    } catch (e: any) {
+      setFeedbackMsg({
+        type: "error",
+        message: e?.message || "Error en la operación.",
+      });
     } finally {
       setLoading(false);
     }
@@ -121,9 +133,12 @@ export default function Users() {
     try {
       await deleteUser(user);
       setFeedbackMsg({ type: "success", message: "Usuario eliminado con éxito" });
-      loadUsers();
-    } catch {
-      setFeedbackMsg({ type: "error", message: "Error eliminando usuario" });
+      await loadUsers();
+    } catch (e: any) {
+      setFeedbackMsg({
+        type: "error",
+        message: e?.message || "Error eliminando usuario",
+      });
     } finally {
       setLoading(false);
     }
@@ -157,8 +172,7 @@ export default function Users() {
         alignItems: "center",
         justifyContent: "center",
         p: 2,
-        background:
-          "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+        background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
       }}
     >
       <Box
@@ -169,26 +183,25 @@ export default function Users() {
           maxWidth: 1100,
           width: "100%",
           p: 3,
-          background:
-            "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+          background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
         }}
       >
         <Card elevation={0} sx={{ background: "transparent", boxShadow: "none" }}>
           <CardContent sx={{ textAlign: "center" }}>
             <RouterLink to="/home">
-            <Box
-              component="img"
-              src="/LogoNetskopeAzul.jpeg"
-              alt="Logo"
-              sx={{
-                width: 70,
-                height: 70,
-                borderRadius: 6,
-                boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
-                mb: 2,
-                mx: "auto",
-              }}
-            />
+              <Box
+                component="img"
+                src="/LogoNetskopeAzul.jpeg"
+                alt="Logo"
+                sx={{
+                  width: 70,
+                  height: 70,
+                  borderRadius: 6,
+                  boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                  mb: 2,
+                  mx: "auto",
+                }}
+              />
             </RouterLink>
             <Typography variant="h4" fontWeight={600} sx={{ mb: 1 }}>
               Users
@@ -232,10 +245,7 @@ export default function Users() {
                 <CircularProgress />
               </Box>
             ) : (
-              <TableContainer
-                component={Paper}
-                sx={{ maxHeight: 400, mb: 3, overflowX: "auto" }}
-              >
+              <TableContainer component={Paper} sx={{ maxHeight: 400, mb: 3, overflowX: "auto" }}>
                 <Table stickyHeader size="small" sx={{ minWidth: 900 }}>
                   <TableHead>
                     <TableRow>
@@ -259,7 +269,6 @@ export default function Users() {
                     ) : (
                       filteredUsers.map((u) => (
                         <TableRow key={u.id}>
-                          
                           <TableCell>{u.userName}</TableCell>
                           <TableCell>{u.email}</TableCell>
                           <TableCell>{u.given_name || "-"}</TableCell>
@@ -268,16 +277,10 @@ export default function Users() {
                           <TableCell>{u.active ? "Sí" : "No"}</TableCell>
                           <TableCell>{formatDate(u.lastModified)}</TableCell>
                           <TableCell align="center">
-                            <IconButton
-                              color="primary"
-                              onClick={() => handleOpenModal(u)}
-                            >
+                            <IconButton color="primary" onClick={() => handleOpenModal(u)}>
                               <EditIcon />
                             </IconButton>
-                            <IconButton
-                              color="error"
-                              onClick={() => handleDelete(u)}
-                            >
+                            <IconButton color="error" onClick={() => handleDelete(u)}>
                               <DeleteIcon />
                             </IconButton>
                           </TableCell>
@@ -323,18 +326,14 @@ export default function Users() {
 
       {/* Modal Crear/Editar */}
       <Dialog open={openModal} onClose={handleCloseModal} fullWidth maxWidth="sm">
-        <DialogTitle>
-          {isEditing ? "Editar Usuario" : "Nuevo Usuario"}
-        </DialogTitle>
+        <DialogTitle>{isEditing ? "Editar Usuario" : "Nuevo Usuario"}</DialogTitle>
         <DialogContent>
           <TextField
             margin="dense"
             label="UserName *"
             fullWidth
             value={formData.userName}
-            onChange={(e) =>
-              setFormData({ ...formData, userName: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, userName: e.target.value })}
             disabled={isEditing}
           />
           <TextField
@@ -349,18 +348,14 @@ export default function Users() {
             label="Nombre (opcional)"
             fullWidth
             value={formData.given_name}
-            onChange={(e) =>
-              setFormData({ ...formData, given_name: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, given_name: e.target.value })}
           />
           <TextField
             margin="dense"
             label="Apellido (opcional)"
             fullWidth
             value={formData.family_name}
-            onChange={(e) =>
-              setFormData({ ...formData, family_name: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, family_name: e.target.value })}
           />
           <TextField
             margin="dense"
@@ -368,17 +363,13 @@ export default function Users() {
             placeholder="Solo si deseas enlazar con otro sistema"
             fullWidth
             value={formData.external_id}
-            onChange={(e) =>
-              setFormData({ ...formData, external_id: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, external_id: e.target.value })}
           />
           {isEditing && (
             <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
               <Checkbox
-                checked={formData.active}
-                onChange={(e) =>
-                  setFormData({ ...formData, active: e.target.checked })
-                }
+                checked={!!formData.active}
+                onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
               />
               <Typography>Activo</Typography>
             </Box>

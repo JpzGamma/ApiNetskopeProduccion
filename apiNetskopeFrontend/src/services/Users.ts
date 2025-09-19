@@ -1,3 +1,5 @@
+import api from "./api";
+
 export type UserType = {
   id: string;
   userName: string;
@@ -9,14 +11,13 @@ export type UserType = {
   lastModified?: string;
 };
 
-const BASE_URL = "http://localhost:8001/Gamma/users";
+const BASE = "/Gamma/users";
 
+/** GET /Gamma/users */
 export async function fetchUsers(): Promise<UserType[]> {
-  const res = await fetch(BASE_URL);
-  if (!res.ok) throw new Error("Error cargando usuarios");
-  const data = await res.json();
+  const { data } = await api.get<any>(BASE);
 
-  return data.Resources.map((u: any) => ({
+  return (data.Resources || []).map((u: any) => ({
     id: u.id,
     userName: u.userName,
     email: u.emails?.[0]?.value || "",
@@ -28,6 +29,7 @@ export async function fetchUsers(): Promise<UserType[]> {
   }));
 }
 
+/** POST /Gamma/users?user_name=...&email=...&... */
 export async function createUser(user: UserType): Promise<void> {
   const params = new URLSearchParams();
   params.append("user_name", user.userName);
@@ -37,12 +39,10 @@ export async function createUser(user: UserType): Promise<void> {
   if (user.external_id) params.append("external_id", user.external_id);
   if (user.active !== undefined) params.append("active", String(user.active));
 
-  const response = await fetch(`${BASE_URL}?${params.toString()}`, {
-    method: "POST",
-  });
-  if (!response.ok) throw new Error("Error creando usuario");
+  await api.post(`${BASE}?${params.toString()}`);
 }
 
+/** PUT /Gamma/users?user_id|user_name=...&email=... */
 export async function updateUser(user: UserType): Promise<void> {
   const params = new URLSearchParams();
   if (user.id) params.append("user_id", user.id);
@@ -54,19 +54,14 @@ export async function updateUser(user: UserType): Promise<void> {
   if (user.external_id) params.append("external_id", user.external_id);
   if (user.active !== undefined) params.append("active", String(user.active));
 
-  const response = await fetch(`${BASE_URL}?${params.toString()}`, {
-    method: "PUT",
-  });
-  if (!response.ok) throw new Error("Error actualizando usuario");
+  await api.put(`${BASE}?${params.toString()}`);
 }
 
+/** DELETE /Gamma/users?user_id|user_name=... */
 export async function deleteUser(user: UserType): Promise<void> {
   const params = new URLSearchParams();
   if (user.id) params.append("user_id", user.id);
   else params.append("user_name", user.userName);
 
-  const response = await fetch(`${BASE_URL}?${params.toString()}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) throw new Error("Error eliminando usuario");
+  await api.delete(`${BASE}?${params.toString()}`);
 }

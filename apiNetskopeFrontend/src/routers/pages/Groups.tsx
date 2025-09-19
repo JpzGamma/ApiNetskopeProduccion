@@ -63,9 +63,11 @@ export default function Groups() {
     try {
       const data = await fetchGroupsService();
       setGroups(data);
-    } catch (error) {
-      setFeedbackMsg({ type: "error", message: "Error cargando grupos." });
-      console.error(error);
+    } catch (error: any) {
+      setFeedbackMsg({
+        type: "error",
+        message: error?.message || "Error cargando grupos.",
+      });
     } finally {
       setLoading(false);
     }
@@ -84,7 +86,10 @@ export default function Groups() {
     setOpenModal(true);
   };
 
-  const handleCloseModal = () => setOpenModal(false);
+  const handleCloseModal = () => {
+    setOpenModal(false);
+    setTimeout(() => setFeedbackMsg({ type: null, message: "" }), 0);
+  };
 
   const handleSubmit = async () => {
     setFeedbackMsg({ type: null, message: "" });
@@ -109,10 +114,12 @@ export default function Groups() {
       }
 
       handleCloseModal();
-      fetchGroups();
-    } catch (error) {
-      console.error(error);
-      setFeedbackMsg({ type: "error", message: "Error en la operación." });
+      await fetchGroups();
+    } catch (error: any) {
+      setFeedbackMsg({
+        type: "error",
+        message: error?.message || "Error en la operación.",
+      });
     } finally {
       setLoading(false);
     }
@@ -125,10 +132,12 @@ export default function Groups() {
     try {
       await deleteGroupService(group);
       setFeedbackMsg({ type: "success", message: "Grupo eliminado con éxito" });
-      fetchGroups();
-    } catch (error) {
-      setFeedbackMsg({ type: "error", message: "Error eliminando grupo" });
-      console.error(error);
+      await fetchGroups();
+    } catch (error: any) {
+      setFeedbackMsg({
+        type: "error",
+        message: error?.message || "Error eliminando grupo",
+      });
     } finally {
       setLoading(false);
     }
@@ -149,8 +158,7 @@ export default function Groups() {
         alignItems: "center",
         justifyContent: "center",
         p: 2,
-        background:
-          "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+        background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
       }}
     >
       <Box
@@ -161,26 +169,25 @@ export default function Groups() {
           maxWidth: 1000,
           width: "100%",
           p: 3,
-          background:
-            "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+          background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
         }}
       >
         <Card elevation={0} sx={{ background: "transparent", boxShadow: "none" }}>
           <CardContent sx={{ textAlign: "center" }}>
             <RouterLink to="/home">
-            <Box
-              component="img"
-              src="/LogoNetskopeAzul.jpeg"
-              alt="Logo"
-              sx={{
-                width: 70,
-                height: 70,
-                borderRadius: 6,
-                boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
-                mb: 2,
-                mx: "auto",
-              }}
-            />
+              <Box
+                component="img"
+                src="/LogoNetskopeAzul.jpeg"
+                alt="Logo"
+                sx={{
+                  width: 70,
+                  height: 70,
+                  borderRadius: 6,
+                  boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                  mb: 2,
+                  mx: "auto",
+                }}
+              />
             </RouterLink>
             <Typography variant="h4" fontWeight={600} sx={{ mb: 1 }}>
               Groups
@@ -224,10 +231,7 @@ export default function Groups() {
                 <CircularProgress />
               </Box>
             ) : (
-              <TableContainer
-                component={Paper}
-                sx={{ maxHeight: 400, mb: 3, overflowX: "auto" }}
-              >
+              <TableContainer component={Paper} sx={{ maxHeight: 400, mb: 3, overflowX: "auto" }}>
                 <Table stickyHeader size="small" sx={{ minWidth: 800 }}>
                   <TableHead>
                     <TableRow>
@@ -253,16 +257,10 @@ export default function Groups() {
                               : "-"}
                           </TableCell>
                           <TableCell align="center">
-                            <IconButton
-                              color="primary"
-                              onClick={() => handleOpenModal(g)}
-                            >
+                            <IconButton color="primary" onClick={() => handleOpenModal(g)}>
                               <EditIcon />
                             </IconButton>
-                            <IconButton
-                              color="error"
-                              onClick={() => handleDelete(g)}
-                            >
+                            <IconButton color="error" onClick={() => handleDelete(g)}>
                               <DeleteIcon />
                             </IconButton>
                           </TableCell>
@@ -308,18 +306,14 @@ export default function Groups() {
 
       {/* Modal Crear/Editar */}
       <Dialog open={openModal} onClose={handleCloseModal} fullWidth maxWidth="sm">
-        <DialogTitle>
-          {isEditing ? "Editar Grupo" : "Nuevo Grupo"}
-        </DialogTitle>
+        <DialogTitle>{isEditing ? "Editar Grupo" : "Nuevo Grupo"}</DialogTitle>
         <DialogContent>
           <TextField
             margin="dense"
             label="Nombre del grupo *"
             fullWidth
             value={formData.displayName}
-            onChange={(e) =>
-              setFormData({ ...formData, displayName: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
             disabled={isEditing}
           />
           {isEditing && (
@@ -328,9 +322,7 @@ export default function Groups() {
               label="Nuevo nombre (opcional)"
               fullWidth
               value={formData.newDisplayName || ""}
-              onChange={(e) =>
-                setFormData({ ...formData, newDisplayName: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, newDisplayName: e.target.value })}
             />
           )}
           <TextField

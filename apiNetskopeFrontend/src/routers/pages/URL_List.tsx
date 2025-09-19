@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Button,
@@ -27,16 +27,27 @@ import {
   List,
   ListItem,
   ListItemText,
+  Checkbox,
+  FormControlLabel,
+  Stack,
+  Divider,
+  Tooltip,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import { Link as RouterLink } from "react-router-dom";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+
 import {
   type URLListType,
+  type BatchResponse,
+  type CreateUrlListResponse,
   fetchUrlLists,
   fetchUrlCount,
   batchUpdateUrlLists,
+  deleteUrlListById,
+  createUrlList,
 } from "../../services/URL_List";
 
 export default function URL_List() {
@@ -45,18 +56,34 @@ export default function URL_List() {
   const [loading, setLoading] = useState(false);
   const [totalUrls, setTotalUrls] = useState(0);
 
+  // Acción masiva
   const [actionType, setActionType] = useState<"append" | "replace">("append");
   const [idsOrNames, setIdsOrNames] = useState("");
   const [urlsInput, setUrlsInput] = useState("");
+  const [allowRegex, setAllowRegex] = useState(false);
+
+  // Feedback + resúmenes (cerrables)
   const [feedbackMsg, setFeedbackMsg] = useState<{
-    type: "error" | "success" | null;
+    type: "error" | "success" | "info" | null;
     message: string;
   }>({ type: null, message: "" });
 
+  const [batchSummary, setBatchSummary] = useState<BatchResponse | null>(null);
+  const [showBatchSummary, setShowBatchSummary] = useState(false);
+
+  // Dialog ver/editar
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedList, setSelectedList] = useState<URLListType | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editableUrls, setEditableUrls] = useState<string[]>([]);
+
+  // Modal Crear
+  const [openCreate, setOpenCreate] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newAllowRegex, setNewAllowRegex] = useState(false);
+  const [newUrls, setNewUrls] = useState("");
+  const [createSummary, setCreateSummary] = useState<CreateUrlListResponse | null>(null);
+  const [showCreateSummary, setShowCreateSummary] = useState(false);
 
   useEffect(() => {
     loadUrlLists();
@@ -68,7 +95,7 @@ export default function URL_List() {
     try {
       const data = await fetchUrlLists();
       setUrlLists(data);
-    } catch (error) {
+    } catch {
       setFeedbackMsg({ type: "error", message: "Error cargando URL Lists." });
     } finally {
       setLoading(false);
@@ -79,13 +106,15 @@ export default function URL_List() {
     try {
       const count = await fetchUrlCount();
       setTotalUrls(count);
-    } catch (error) {
-      console.error(error);
-    }
+    } catch {}
   };
+
+  /* ---------- Submit batch ---------- */
 
   const handleSubmit = async () => {
     setFeedbackMsg({ type: null, message: "" });
+    setBatchSummary(null);
+    setShowBatchSummary(false);
 
     if (!idsOrNames.trim()) {
       setFeedbackMsg({ type: "error", message: "Debes ingresar IDs o nombres." });
@@ -99,60 +128,72 @@ export default function URL_List() {
     const urls = urlsInput
       .split("\n")
       .map((u) => u.trim())
-      .filter((u) => u !== "");
+      .filter(Boolean);
 
-    // Validación robusta usando URL constructor:
-    const invalidUrls = urls.filter((url) => {
-      try {
-        // Añade protocolo si falta para validar correctamente
-        const fixedUrl = url.match(/^https?:\/\//i) ? url : "http://" + url;
-        new URL(fixedUrl);
-        return false;
-      } catch {
-        return true;
-      }
-    });
-
-    if (invalidUrls.length > 0) {
+    const invalids = urls.filter((u) => u.length < 2);
+    if (invalids.length > 0) {
       setFeedbackMsg({
         type: "error",
-        message: `URLs/IPs inválidas detectadas:\n${invalidUrls.join(", ")}`,
+        message: `Entradas inválidas:\n${invalids.join(", ")}`,
       });
       return;
     }
 
     setLoading(true);
     try {
-      await batchUpdateUrlLists(actionType, idsOrNames, urlsInput);
+      const resp = await batchUpdateUrlLists(actionType, idsOrNames, urlsInput, allowRegex);
+      setBatchSummary(resp);
+      setShowBatchSummary(true);
       setFeedbackMsg({
         type: "success",
-        message: `Acción "${actionType}" ejecutada con éxito.`,
+        message: `Acción "${actionType}" ejecutada. Deploy aplicado automáticamente.`,
       });
       setIdsOrNames("");
       setUrlsInput("");
-      loadUrlLists();
-      loadUrlCount();
-    } catch (error) {
-      setFeedbackMsg({ type: "error", message: "Hubo un error al ejecutar la acción." });
+      setAllowRegex(false);
+      await Promise.all([loadUrlLists(), loadUrlCount()]);
+    } catch (error: any) {
+      setFeedbackMsg({ type: "error", message: error?.message ?? "Error al ejecutar la acción." });
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredUrls = searchName
-    ? urlLists.filter((u) =>
-        u.name
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .includes(
-            searchName
-              .toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-          )
-      )
-    : urlLists;
+  /* ---------- Delete (por ID) ---------- */
+
+  const handleDeleteList = async (list: URLListType) => {
+    if (!confirm(`¿Eliminar la URL List "${list.name}" (ID ${list.id})?`)) return;
+    setLoading(true);
+    try {
+      await deleteUrlListById(list.id);
+      setFeedbackMsg({
+        type: "success",
+        message: `Lista ${list.id} eliminada. Deploy aplicado automáticamente.`,
+      });
+      await Promise.all([loadUrlLists(), loadUrlCount()]);
+    } catch (e: any) {
+      setFeedbackMsg({ type: "error", message: e?.message ?? "Error al eliminar." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ---------- Tabla / filtros ---------- */
+
+  const filteredUrls = useMemo(() => {
+    if (!searchName) return urlLists;
+    const needle = searchName
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    return urlLists.filter((u) =>
+      u.name
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .includes(needle)
+    );
+  }, [searchName, urlLists]);
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleString("es-ES", {
@@ -162,6 +203,8 @@ export default function URL_List() {
       hour: "2-digit",
       minute: "2-digit",
     });
+
+  /* ---------- Dialog ver/editar ---------- */
 
   const handleOpenDialog = (list: URLListType, isEdit = false) => {
     setSelectedList(list);
@@ -176,24 +219,69 @@ export default function URL_List() {
     setEditMode(false);
   };
 
-  const handleDeleteUrl = (url: string) => {
-    setEditableUrls(editableUrls.filter((u) => u !== url));
+  const handleDeleteUrlFromEdit = (url: string) => {
+    setEditableUrls((prev) => prev.filter((u) => u !== url));
   };
 
   const handleSaveEdit = async () => {
     if (!selectedList) return;
-
+    setLoading(true);
     try {
-      await batchUpdateUrlLists("replace", selectedList.id.toString(), editableUrls.join("\n"));
+      // Para edición puntual usamos replace sobre el ID
+      await batchUpdateUrlLists("replace", selectedList.id.toString(), editableUrls.join("\n"), false);
+      setFeedbackMsg({ type: "success", message: "Lista actualizada correctamente." });
+      await loadUrlLists();
+    } catch (e: any) {
+      setFeedbackMsg({ type: "error", message: e?.message ?? "Error al actualizar la lista." });
+    } finally {
+      setLoading(false);
+      handleCloseDialog();
+    }
+  };
+
+  /* ---------- Crear (modal) ---------- */
+
+  const handleOpenCreate = () => {
+    setOpenCreate(true);
+  };
+
+  const handleCloseCreate = () => {
+    setOpenCreate(false);
+    setNewName("");
+    setNewAllowRegex(false);
+    setNewUrls("");
+  };
+
+  const handleCreateList = async () => {
+    setFeedbackMsg({ type: null, message: "" });
+    setCreateSummary(null);
+    setShowCreateSummary(false);
+
+    if (!newName.trim()) {
+      setFeedbackMsg({ type: "error", message: "Debes ingresar un nombre para la lista." });
+      return;
+    }
+    if (!newUrls.trim()) {
+      setFeedbackMsg({ type: "error", message: "Debes ingresar al menos una URL." });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const resp = await createUrlList(newName.trim(), newUrls, newAllowRegex);
+      setCreateSummary(resp);
+      setShowCreateSummary(true);
       setFeedbackMsg({
         type: "success",
-        message: "Lista actualizada correctamente.",
+        message: `Lista creada como '${resp.create.type_used}'. Deploy aplicado automáticamente.`,
       });
-      loadUrlLists();
-    } catch (error) {
-      setFeedbackMsg({ type: "error", message: "Error al actualizar la lista." });
+      handleCloseCreate();
+      await Promise.all([loadUrlLists(), loadUrlCount()]);
+    } catch (e: any) {
+      setFeedbackMsg({ type: "error", message: e?.message ?? "Error al crear la lista." });
+    } finally {
+      setLoading(false);
     }
-    handleCloseDialog();
   };
 
   return (
@@ -243,14 +331,30 @@ export default function URL_List() {
               Total de URLs: {totalUrls}
             </Typography>
 
-            <TextField
-              label="Buscar URL List (nombre exacto)"
-              variant="outlined"
-              size="small"
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              sx={{ mb: 3, width: "100%", maxWidth: 400 }}
-            />
+            {/* Buscador + Crear */}
+            <Box
+              sx={{
+                display: "flex",
+                gap: 2,
+                alignItems: "center",
+                justifyContent: "center",
+                mb: 3,
+                flexWrap: "wrap",
+              }}
+            >
+              <Button variant="contained" onClick={handleOpenCreate} sx={{ textTransform: "none" }}>
+                Crear
+              </Button>
+
+              <TextField
+                label="Buscar URL List (nombre exacto)"
+                variant="outlined"
+                size="small"
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                sx={{ width: "100%", maxWidth: 400 }}
+              />
+            </Box>
 
             {loading ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
@@ -264,7 +368,7 @@ export default function URL_List() {
                       <TableCell>ID</TableCell>
                       <TableCell>Nombre</TableCell>
                       <TableCell>Tipo</TableCell>
-                      <TableCell>Cant.Urls</TableCell>
+                      <TableCell>Cant. URLs</TableCell>
                       <TableCell>Modificado por</TableCell>
                       <TableCell>Fecha Modificación</TableCell>
                       <TableCell>Acciones</TableCell>
@@ -287,23 +391,21 @@ export default function URL_List() {
                           <TableCell>{list.modify_by}</TableCell>
                           <TableCell>{formatDate(list.modify_time)}</TableCell>
                           <TableCell>
-                            {/* Ojo azul */}
-                            <IconButton onClick={() => handleOpenDialog(list, false)} color="primary">
-                              <VisibilityIcon />
-                            </IconButton>
-
-                            {/* Lápiz amarillo */}
-                            <IconButton
-                              onClick={() => handleOpenDialog(list, true)}
-                              sx={{ color: "#FFA726" }} // color amarillo
-                            >
-                              <EditIcon />
-                            </IconButton>
-
-                            {/* Eliminar */}
-                            <IconButton onClick={() => alert(`Eliminar lista con ID: ${list.id}`)} color="error">
-                              <DeleteIcon />
-                            </IconButton>
+                            <Tooltip title="Ver">
+                              <IconButton onClick={() => handleOpenDialog(list, false)} color="primary">
+                                <VisibilityIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Editar">
+                              <IconButton onClick={() => handleOpenDialog(list, true)} sx={{ color: "#FFA726" }}>
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Eliminar">
+                              <IconButton onClick={() => handleDeleteList(list)} color="error">
+                                <DeleteIcon />
+                              </IconButton>
+                            </Tooltip>
                           </TableCell>
                         </TableRow>
                       ))
@@ -313,6 +415,7 @@ export default function URL_List() {
               </TableContainer>
             )}
 
+            {/* Alert de feedback (verde/rojo) */}
             {feedbackMsg.type && (
               <Alert
                 severity={feedbackMsg.type}
@@ -323,13 +426,135 @@ export default function URL_List() {
               </Alert>
             )}
 
+            {/* Resumen de creación — CERRABLE */}
+            {createSummary && showCreateSummary && (
+              <Paper sx={{ p: 2, mb: 3, position: "relative" }}>
+                <IconButton
+                  size="small"
+                  aria-label="cerrar"
+                  onClick={() => setShowCreateSummary(false)}
+                  sx={{ position: "absolute", right: 8, top: 8 }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                  Lista creada
+                </Typography>
+                <Typography variant="body2">
+                  <b>ID:</b> {createSummary.create.created.id ?? "—"} — <b>Tipo:</b>{" "}
+                  {createSummary.create.type_used} — <b>Enviados:</b> {createSummary.create.sent}
+                </Typography>
+                {createSummary.create.rejected.length > 0 && (
+                  <Typography variant="caption" color="error">
+                    Rechazados: {createSummary.create.rejected.join(", ")}
+                  </Typography>
+                )}
+              </Paper>
+            )}
+
+            {/* Resumen del último batch — CERRABLE */}
+            {batchSummary && showBatchSummary && (
+              <Paper sx={{ p: 2, mb: 3, position: "relative" }}>
+                <IconButton
+                  size="small"
+                  aria-label="cerrar"
+                  onClick={() => setShowBatchSummary(false)}
+                  sx={{ position: "absolute", right: 8, top: 8 }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                  Resumen de la carga
+                </Typography>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={2}
+                  divider={<Divider flexItem orientation="vertical" />}
+                >
+                  <Box>
+                    <Typography variant="body2">
+                      <b>Targets:</b> {batchSummary.targets.join(", ") || "—"}
+                    </Typography>
+                    {batchSummary.not_found_names.length > 0 && (
+                      <Typography variant="body2" color="warning.main">
+                        <b>No encontrados:</b> {batchSummary.not_found_names.join(", ")}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Box>
+                    <Typography variant="body2">
+                      <b>Aceptados (exact):</b> {batchSummary.accepted.exact.length}
+                    </Typography>
+                    <Typography variant="body2">
+                      <b>Wildcard como exact:</b> {batchSummary.accepted.wildcard_as_exact.length}
+                    </Typography>
+                    {batchSummary.accepted.regex && (
+                      <Typography variant="body2">
+                        <b>Regex:</b> {batchSummary.accepted.regex.length}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="error">
+                      <b>Rechazados:</b> {batchSummary.rejected.length}
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                {batchSummary.rejected.length > 0 && (
+                  <Typography variant="caption" sx={{ display: "block", mt: 1 }}>
+                    <b>Rechazados:</b> {batchSummary.rejected.join(", ")}
+                  </Typography>
+                )}
+
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Resultados por lista:
+                  </Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>ID</TableCell>
+                        <TableCell>Tipo</TableCell>
+                        <TableCell>Estatus</TableCell>
+                        <TableCell>Enviados</TableCell>
+                        <TableCell>Detalle</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {batchSummary.results.map((r) => (
+                        <TableRow key={`${r.id}-${r.type}`}>
+                          <TableCell>{r.id}</TableCell>
+                          <TableCell>{r.type}</TableCell>
+                          <TableCell>{r.status}</TableCell>
+                          <TableCell>{r.sent ?? "—"}</TableCell>
+                          <TableCell
+                            sx={{
+                              maxWidth: 380,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {r.error || r.reason || "OK"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
+              </Paper>
+            )}
+
             {/* Acción masiva */}
             <Box
               sx={{
                 borderTop: "1px solid rgba(0,0,0,0.1)",
                 pt: 3,
                 textAlign: "left",
-                maxWidth: 600,
+                maxWidth: 700,
                 mx: "auto",
               }}
             >
@@ -345,8 +570,8 @@ export default function URL_List() {
                   label="Seleccionar acción"
                   onChange={(e) => setActionType(e.target.value as "append" | "replace")}
                 >
-                  <MenuItem value="append">Añadir </MenuItem>
-                  <MenuItem value="replace">Reemplazar </MenuItem>
+                  <MenuItem value="append">Añadir</MenuItem>
+                  <MenuItem value="replace">Reemplazar</MenuItem>
                 </Select>
               </FormControl>
 
@@ -358,25 +583,31 @@ export default function URL_List() {
                 value={idsOrNames}
                 onChange={(e) => setIdsOrNames(e.target.value)}
                 sx={{ mb: 2 }}
-                placeholder="Ejemplo: 77, [Semillero] AllowList"
+                placeholder="Ej: 77, 79, [Semillero] AllowList"
+              />
+
+              <FormControlLabel
+                control={<Checkbox checked={allowRegex} onChange={(e) => setAllowRegex(e.target.checked)} />}
+                label="Permitir Regex (solo listas tipo regex)"
+                sx={{ mb: 2 }}
               />
 
               <TextField
-                label="Ingresa URLs"
+                label="Ingresa URLs (una por línea)"
                 variant="outlined"
                 fullWidth
                 multiline
-                rows={4}
+                rows={6}
                 size="small"
                 value={urlsInput}
                 onChange={(e) => setUrlsInput(e.target.value)}
                 sx={{ mb: 3 }}
                 placeholder={`example.com
-www.example.com
+*.example.com
+example.com/*
 sub.domain.com
-http://example.com
-https://example.com/path
-example.com/path/to/page?query=123`}
+123.123.123.123
+example.com/path/to/page`}
               />
 
               <Button
@@ -425,11 +656,10 @@ example.com/path/to/page?query=123`}
         <Typography variant="body2">&copy; 2025 ApiNetskope</Typography>
       </Box>
 
-      {/* Modal */}
+      {/* Modal ver/editar */}
       <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
         <DialogTitle>
-          {selectedList?.name}
-          {editMode ? " - Editar URLs" : " - Ver URLs"}
+          {selectedList?.name} {editMode ? "– Editar URLs" : "– Ver URLs"}
         </DialogTitle>
         <DialogContent dividers>
           {editMode ? (
@@ -438,7 +668,7 @@ example.com/path/to/page?query=123`}
                 <ListItem
                   key={url}
                   secondaryAction={
-                    <IconButton edge="end" onClick={() => handleDeleteUrl(url)} color="error">
+                    <IconButton edge="end" onClick={() => handleDeleteUrlFromEdit(url)} color="error">
                       <DeleteIcon />
                     </IconButton>
                   }
@@ -474,6 +704,49 @@ example.com/path/to/page?query=123`}
               Guardar
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal Crear */}
+      <Dialog open={openCreate} onClose={handleCloseCreate} fullWidth maxWidth="sm">
+        <DialogTitle>Crear URL List</DialogTitle>
+        <DialogContent dividers>
+          <TextField
+            label="Nombre de la lista"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            fullWidth
+            sx={{ mb: 2 }}
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={newAllowRegex}
+                onChange={(e) => setNewAllowRegex(e.target.checked)}
+              />
+            }
+            label="Permitir Regex (si contiene sintaxis de regex)"
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            label="URLs iniciales (una por línea)"
+            value={newUrls}
+            onChange={(e) => setNewUrls(e.target.value)}
+            fullWidth
+            multiline
+            rows={6}
+            placeholder={`example.com
+*.example.com
+example.com/*
+123.123.123.123
+example.com/path`}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseCreate}>Cancelar</Button>
+          <Button variant="contained" onClick={handleCreateList}>
+            Crear lista
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
