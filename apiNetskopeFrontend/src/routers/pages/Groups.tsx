@@ -167,6 +167,7 @@ export default function Groups() {
       >
         <Card elevation={0} sx={{ background: "transparent", boxShadow: "none" }}>
           <CardContent sx={{ textAlign: "center" }}>
+            <RouterLink to="/home">
             <Box
               component="img"
               src="/LogoNetskopeAzul.jpeg"
@@ -180,6 +181,7 @@ export default function Groups() {
                 mx: "auto",
               }}
             />
+            </RouterLink>
             <Typography variant="h4" fontWeight={600} sx={{ mb: 1 }}>
               Groups
             </Typography>
@@ -229,7 +231,6 @@ export default function Groups() {
                 <Table stickyHeader size="small" sx={{ minWidth: 800 }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>ID</TableCell>
                       <TableCell>Nombre</TableCell>
                       <TableCell>Miembros</TableCell>
                       <TableCell align="center">Acciones</TableCell>
@@ -245,7 +246,6 @@ export default function Groups() {
                     ) : (
                       filteredGroups.map((g) => (
                         <TableRow key={g.id}>
-                          <TableCell>{g.id}</TableCell>
                           <TableCell>{g.displayName}</TableCell>
                           <TableCell>
                             {g.members && g.members.length > 0

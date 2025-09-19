@@ -175,6 +175,7 @@ export default function Users() {
       >
         <Card elevation={0} sx={{ background: "transparent", boxShadow: "none" }}>
           <CardContent sx={{ textAlign: "center" }}>
+            <RouterLink to="/home">
             <Box
               component="img"
               src="/LogoNetskopeAzul.jpeg"
@@ -188,6 +189,7 @@ export default function Users() {
                 mx: "auto",
               }}
             />
+            </RouterLink>
             <Typography variant="h4" fontWeight={600} sx={{ mb: 1 }}>
               Users
             </Typography>
@@ -237,7 +239,6 @@ export default function Users() {
                 <Table stickyHeader size="small" sx={{ minWidth: 900 }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>ID</TableCell>
                       <TableCell>UserName</TableCell>
                       <TableCell>Email</TableCell>
                       <TableCell>Nombre</TableCell>
@@ -258,7 +259,7 @@ export default function Users() {
                     ) : (
                       filteredUsers.map((u) => (
                         <TableRow key={u.id}>
-                          <TableCell>{u.id}</TableCell>
+                          
                           <TableCell>{u.userName}</TableCell>
                           <TableCell>{u.email}</TableCell>
                           <TableCell>{u.given_name || "-"}</TableCell>

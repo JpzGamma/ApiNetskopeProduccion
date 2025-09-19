@@ -19,8 +19,19 @@ import {
   TableRow,
   Paper,
   Alert,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemText,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
 import {
   type URLListType,
   fetchUrlLists,
@@ -41,6 +52,11 @@ export default function URL_List() {
     type: "error" | "success" | null;
     message: string;
   }>({ type: null, message: "" });
+
+  const [openDialog, setOpenDialog] = useState(false);
+  const [selectedList, setSelectedList] = useState<URLListType | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editableUrls, setEditableUrls] = useState<string[]>([]);
 
   useEffect(() => {
     loadUrlLists();
@@ -80,6 +96,31 @@ export default function URL_List() {
       return;
     }
 
+    const urls = urlsInput
+      .split("\n")
+      .map((u) => u.trim())
+      .filter((u) => u !== "");
+
+    // Validación robusta usando URL constructor:
+    const invalidUrls = urls.filter((url) => {
+      try {
+        // Añade protocolo si falta para validar correctamente
+        const fixedUrl = url.match(/^https?:\/\//i) ? url : "http://" + url;
+        new URL(fixedUrl);
+        return false;
+      } catch {
+        return true;
+      }
+    });
+
+    if (invalidUrls.length > 0) {
+      setFeedbackMsg({
+        type: "error",
+        message: `URLs/IPs inválidas detectadas:\n${invalidUrls.join(", ")}`,
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       await batchUpdateUrlLists(actionType, idsOrNames, urlsInput);
@@ -99,7 +140,18 @@ export default function URL_List() {
   };
 
   const filteredUrls = searchName
-    ? urlLists.filter((u) => u.name.toLowerCase() === searchName.toLowerCase())
+    ? urlLists.filter((u) =>
+        u.name
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .includes(
+            searchName
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+          )
+      )
     : urlLists;
 
   const formatDate = (iso: string) =>
@@ -110,6 +162,39 @@ export default function URL_List() {
       hour: "2-digit",
       minute: "2-digit",
     });
+
+  const handleOpenDialog = (list: URLListType, isEdit = false) => {
+    setSelectedList(list);
+    setEditMode(isEdit);
+    setEditableUrls(list.data.urls);
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setSelectedList(null);
+    setEditMode(false);
+  };
+
+  const handleDeleteUrl = (url: string) => {
+    setEditableUrls(editableUrls.filter((u) => u !== url));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedList) return;
+
+    try {
+      await batchUpdateUrlLists("replace", selectedList.id.toString(), editableUrls.join("\n"));
+      setFeedbackMsg({
+        type: "success",
+        message: "Lista actualizada correctamente.",
+      });
+      loadUrlLists();
+    } catch (error) {
+      setFeedbackMsg({ type: "error", message: "Error al actualizar la lista." });
+    }
+    handleCloseDialog();
+  };
 
   return (
     <Box
@@ -128,7 +213,7 @@ export default function URL_List() {
           backgroundColor: "white",
           borderRadius: "12px",
           boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)",
-          maxWidth: 1000,
+          maxWidth: 1200,
           width: "100%",
           p: 3,
           background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
@@ -136,20 +221,21 @@ export default function URL_List() {
       >
         <Card elevation={0} sx={{ background: "transparent", boxShadow: "none" }}>
           <CardContent sx={{ textAlign: "center" }}>
-            {/* Logo */}
-            <Box
-              component="img"
-              src="/LogoNetskopeAzul.jpeg"
-              alt="Logo"
-              sx={{
-                width: 70,
-                height: 70,
-                borderRadius: 6,
-                boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
-                mb: 2,
-                mx: "auto",
-              }}
-            />
+            <RouterLink to="/home">
+              <Box
+                component="img"
+                src="/LogoNetskopeAzul.jpeg"
+                alt="Logo"
+                sx={{
+                  width: 70,
+                  height: 70,
+                  borderRadius: 6,
+                  boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                  mb: 2,
+                  mx: "auto",
+                }}
+              />
+            </RouterLink>
             <Typography variant="h4" fontWeight={600} sx={{ mb: 1 }}>
               URL Lists
             </Typography>
@@ -157,7 +243,6 @@ export default function URL_List() {
               Total de URLs: {totalUrls}
             </Typography>
 
-            {/* Search */}
             <TextField
               label="Buscar URL List (nombre exacto)"
               variant="outlined"
@@ -167,7 +252,6 @@ export default function URL_List() {
               sx={{ mb: 3, width: "100%", maxWidth: 400 }}
             />
 
-            {/* Tabla */}
             {loading ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
                 <CircularProgress />
@@ -183,24 +267,44 @@ export default function URL_List() {
                       <TableCell>Cant.Urls</TableCell>
                       <TableCell>Modificado por</TableCell>
                       <TableCell>Fecha Modificación</TableCell>
+                      <TableCell>Acciones</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {filteredUrls.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} align="center">
+                        <TableCell colSpan={7} align="center">
                           No se encontraron resultados
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredUrls.map(({ id, name, data: { type, urls }, modify_by, modify_time }) => (
-                        <TableRow key={id}>
-                          <TableCell>{id}</TableCell>
-                          <TableCell>{name}</TableCell>
-                          <TableCell>{type}</TableCell>
-                          <TableCell>{urls.length}</TableCell>
-                          <TableCell>{modify_by}</TableCell>
-                          <TableCell>{formatDate(modify_time)}</TableCell>
+                      filteredUrls.map((list) => (
+                        <TableRow key={list.id}>
+                          <TableCell>{list.id}</TableCell>
+                          <TableCell>{list.name}</TableCell>
+                          <TableCell>{list.data.type}</TableCell>
+                          <TableCell>{list.data.urls.length}</TableCell>
+                          <TableCell>{list.modify_by}</TableCell>
+                          <TableCell>{formatDate(list.modify_time)}</TableCell>
+                          <TableCell>
+                            {/* Ojo azul */}
+                            <IconButton onClick={() => handleOpenDialog(list, false)} color="primary">
+                              <VisibilityIcon />
+                            </IconButton>
+
+                            {/* Lápiz amarillo */}
+                            <IconButton
+                              onClick={() => handleOpenDialog(list, true)}
+                              sx={{ color: "#FFA726" }} // color amarillo
+                            >
+                              <EditIcon />
+                            </IconButton>
+
+                            {/* Eliminar */}
+                            <IconButton onClick={() => alert(`Eliminar lista con ID: ${list.id}`)} color="error">
+                              <DeleteIcon />
+                            </IconButton>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -209,18 +313,17 @@ export default function URL_List() {
               </TableContainer>
             )}
 
-            {/* Mensajes */}
             {feedbackMsg.type && (
               <Alert
                 severity={feedbackMsg.type}
                 onClose={() => setFeedbackMsg({ type: null, message: "" })}
-                sx={{ mb: 2 }}
+                sx={{ mb: 2, whiteSpace: "pre-line" }}
               >
                 {feedbackMsg.message}
               </Alert>
             )}
 
-            {/* Formulario acción masiva */}
+            {/* Acción masiva */}
             <Box
               sx={{
                 borderTop: "1px solid rgba(0,0,0,0.1)",
@@ -242,8 +345,8 @@ export default function URL_List() {
                   label="Seleccionar acción"
                   onChange={(e) => setActionType(e.target.value as "append" | "replace")}
                 >
-                  <MenuItem value="append">Append</MenuItem>
-                  <MenuItem value="replace">Replace</MenuItem>
+                  <MenuItem value="append">Añadir </MenuItem>
+                  <MenuItem value="replace">Reemplazar </MenuItem>
                 </Select>
               </FormControl>
 
@@ -268,7 +371,12 @@ export default function URL_List() {
                 value={urlsInput}
                 onChange={(e) => setUrlsInput(e.target.value)}
                 sx={{ mb: 3 }}
-                placeholder="example.com\nwww.google.com\nyoutube.com"
+                placeholder={`example.com
+www.example.com
+sub.domain.com
+http://example.com
+https://example.com/path
+example.com/path/to/page?query=123`}
               />
 
               <Button
@@ -313,10 +421,61 @@ export default function URL_List() {
         </Card>
       </Box>
 
-      {/* Footer */}
       <Box sx={{ mt: 2, textAlign: "center", color: "text.secondary" }}>
         <Typography variant="body2">&copy; 2025 ApiNetskope</Typography>
       </Box>
+
+      {/* Modal */}
+      <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
+        <DialogTitle>
+          {selectedList?.name}
+          {editMode ? " - Editar URLs" : " - Ver URLs"}
+        </DialogTitle>
+        <DialogContent dividers>
+          {editMode ? (
+            <List sx={{ maxHeight: 300, overflowY: "auto" }}>
+              {editableUrls.map((url) => (
+                <ListItem
+                  key={url}
+                  secondaryAction={
+                    <IconButton edge="end" onClick={() => handleDeleteUrl(url)} color="error">
+                      <DeleteIcon />
+                    </IconButton>
+                  }
+                >
+                  <ListItemText primary={url} />
+                </ListItem>
+              ))}
+              {editableUrls.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 2 }}>
+                  No hay URLs en esta lista.
+                </Typography>
+              )}
+            </List>
+          ) : (
+            <List sx={{ maxHeight: 300, overflowY: "auto" }}>
+              {selectedList?.data.urls.map((url) => (
+                <ListItem key={url}>
+                  <ListItemText primary={url} />
+                </ListItem>
+              ))}
+              {selectedList?.data.urls.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 2 }}>
+                  No hay URLs en esta lista.
+                </Typography>
+              )}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cerrar</Button>
+          {editMode && (
+            <Button variant="contained" onClick={handleSaveEdit}>
+              Guardar
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
