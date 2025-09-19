@@ -77,6 +77,7 @@ export default function CciApps() {
           }}
         >
           <CardContent sx={{ p: 4, textAlign: "center" }}>
+            <RouterLink to="/home">
             {/* Logo */}
             <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
               <Box
@@ -90,7 +91,9 @@ export default function CciApps() {
                   boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
                 }}
               />
+              
             </Box>
+            </RouterLink>
 
             {/* Título */}
             <Typography variant="h5" fontWeight={600} sx={{ mb: 2 }}>

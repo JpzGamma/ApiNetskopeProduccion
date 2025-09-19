@@ -94,6 +94,7 @@ export default function Homepage() {
           <CardContent sx={{ p: 4, textAlign: 'center' }}>
             {/* Logo */}
             <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+              <RouterLink to="/home">
               <Box
                 component="img"
                 src="/LogoNetskopeAzul.jpeg"
@@ -107,6 +108,7 @@ export default function Homepage() {
                   mx: "auto",
                 }}
               />
+              </RouterLink>
             </Box>
             {/* Título de bienvenida */}
             <Typography
