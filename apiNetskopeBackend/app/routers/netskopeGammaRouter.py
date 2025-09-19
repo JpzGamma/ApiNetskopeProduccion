@@ -8,7 +8,9 @@ from app.services.netskopeGammaService import (
     count_url_lists,
     find_url_list_by_name,
     patch_url_list,
-    deploy_url_lists,   # <-- nuevo
+    deploy_url_lists,
+    delete_url_list_by_id,     # <-- nuevo
+    delete_url_list_by_name,   # <-- nuevo
 )
 
 router = APIRouter(prefix="/Gamma", tags=["Gamma-URl_LIst"])
@@ -88,7 +90,6 @@ def gamma_patch_url_lists_batch(
     if not ids and not names:
         raise HTTPException(status_code=400, detail="Debes enviar al menos 'ids' o 'names'")
 
-    # Normalizar URLs a hosts únicos
     hosts: list[str] = []
     seen = set()
     for u in urls or []:
@@ -99,7 +100,6 @@ def gamma_patch_url_lists_batch(
     if not hosts:
         raise HTTPException(status_code=422, detail="No hay URLs válidas para enviar")
 
-    # Resolver IDs
     target_ids: set[int] = set()
 
     if ids:
@@ -144,7 +144,6 @@ def gamma_patch_url_lists_batch(
         "results": results,
     }
 
-    # Deploy opcional
     if deploy:
         try:
             out["deploy"] = deploy_url_lists()
@@ -164,3 +163,45 @@ def gamma_deploy_url_lists():
         return deploy_url_lists()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------- DELETE (nuevo) ----------
+
+@router.delete(
+    "/url-lists/by-name",
+    summary="Elimina una URL List por nombre exacto"
+)
+def gamma_delete_url_list_by_name(name: str = Query(..., description="Nombre exacto de la URL List"),
+                                  deploy: bool = Query(False, description="Aplicar deploy luego de eliminar")):
+    try:
+        result = delete_url_list_by_name(name)
+        out: Dict[str, Any] = {"deleted": result}
+        if deploy:
+            try:
+                out["deploy"] = deploy_url_lists()
+            except Exception as e:
+                out["deploy_error"] = str(e)
+        return out
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete(
+    "/url-lists/{list_id}",
+    summary="Elimina una URL List por ID (queda 'pending' hasta deploy)"
+)
+def gamma_delete_url_list_by_id(list_id: int, deploy: bool = Query(False, description="Aplicar deploy luego de eliminar")):
+    try:
+        result = delete_url_list_by_id(list_id)
+        out: Dict[str, Any] = {"deleted": result}
+        if deploy:
+            try:
+                out["deploy"] = deploy_url_lists()
+            except Exception as e:
+                out["deploy_error"] = str(e)
+        return out
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
