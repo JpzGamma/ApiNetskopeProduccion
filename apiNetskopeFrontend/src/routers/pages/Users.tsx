@@ -166,7 +166,7 @@ export default function Users() {
           backgroundColor: "white",
           borderRadius: "12px",
           boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)",
-          maxWidth: 1100,
+          maxWidth: 1500,
           width: "100%",
           p: 3,
           background:
@@ -243,7 +243,6 @@ export default function Users() {
                       <TableCell>Email</TableCell>
                       <TableCell>Nombre</TableCell>
                       <TableCell>Apellido</TableCell>
-                      <TableCell>External ID</TableCell>
                       <TableCell>Activo</TableCell>
                       <TableCell>Última modificación</TableCell>
                       <TableCell align="center">Acciones</TableCell>
@@ -264,7 +263,6 @@ export default function Users() {
                           <TableCell>{u.email}</TableCell>
                           <TableCell>{u.given_name || "-"}</TableCell>
                           <TableCell>{u.family_name || "-"}</TableCell>
-                          <TableCell>{u.external_id || "-"}</TableCell>
                           <TableCell>{u.active ? "Sí" : "No"}</TableCell>
                           <TableCell>{formatDate(u.lastModified)}</TableCell>
                           <TableCell align="center">
