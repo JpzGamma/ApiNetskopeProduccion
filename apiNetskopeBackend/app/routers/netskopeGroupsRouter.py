@@ -2,8 +2,8 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from app.services.netskopeGroupsService import (
-    scim_list_groups_with_members,
-    scim_get_group_by_name_with_members,
+    scim_list_groups_with_members,   # <- NUEVO: lista y siempre trae members
+    scim_get_group_by_name_with_members,  # <- siempre trae members
     scim_create_group_with_members,
     scim_delete_group,
     scim_patch_group,
@@ -13,6 +13,11 @@ from app.services.netskopeGroupsService import (
 router = APIRouter(prefix="/Gamma", tags=["Gamma - Groups"])
 
 
+# ------------------------------------------------------------------
+# GET /Gamma/groups
+# - Si envías 'name': devuelve ese grupo **SIEMPRE con members**.
+# - Si NO envías 'name': lista **todos** los grupos (paginado) **con members**.
+# ------------------------------------------------------------------
 @router.get("/groups", summary="Lista grupos (siempre con members) o devuelve uno por displayName")
 def get_groups(
     name: Optional[str] = Query(
@@ -21,20 +26,20 @@ def get_groups(
     ),
     start_index: int = Query(1, ge=1, description="Paginación cuando no se envía 'name'"),
     count: int = Query(100, ge=1, le=1000, description="Paginación cuando no se envía 'name'"),
-    max_workers: int = Query(32, description="Concurrencia al expandir members (si el tenant no soporta attributes=members)"),
 ):
     try:
         if name:
             g = scim_get_group_by_name_with_members(name)
             if not g:
                 raise HTTPException(status_code=404, detail=f"No se encontró el grupo '{name}'")
+            # Garantizar atributo members presente
             if "members" not in g:
                 g["members"] = []
             return g
 
-        data = scim_list_groups_with_members(
-            start_index=start_index, count=count, max_workers=max_workers
-        )
+        # Sin 'name' -> listar todos con members
+        data = scim_list_groups_with_members(start_index=start_index, count=count)
+        # Garantizar members en cada recurso
         if isinstance(data, dict):
             for r in data.get("Resources", []) or []:
                 if "members" not in r:
@@ -46,6 +51,10 @@ def get_groups(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ------------------------------------------------------------------
+# POST /Gamma/groups
+# Crea grupo por nombre; 'members' (opcional) acepta usernames/correos/ids
+# ------------------------------------------------------------------
 @router.post("/groups", summary="Crea un grupo por nombre y miembros (username/correo/id)")
 def create_group(
     group_name: str = Query(..., description="displayName del grupo a crear"),
@@ -60,6 +69,10 @@ def create_group(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ------------------------------------------------------------------
+# DELETE /Gamma/groups
+# Elimina por id o por nombre
+# ------------------------------------------------------------------
 @router.delete("/groups", summary="Elimina un grupo por id o por nombre")
 def delete_group(
     group_id: Optional[str] = Query(default=None, description="ID SCIM del grupo"),
@@ -71,6 +84,10 @@ def delete_group(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ------------------------------------------------------------------
+# PATCH /Gamma/groups/patch
+# Agrega/Remueve miembros por username/correo/id y/o renombra el grupo
+# ------------------------------------------------------------------
 @router.patch(
     "/groups/patch",
     summary="PATCH de grupo: agregar/quitar miembros (username/correo/id) y/o renombrar"
@@ -98,6 +115,10 @@ def patch_group(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ------------------------------------------------------------------
+# DELETE /Gamma/groups/memberDelete
+# Elimina un miembro por username/correo/id de un grupo (id o nombre)
+# ------------------------------------------------------------------
 @router.delete(
     "/groups/memberDelete",
     summary="Elimina un usuario del grupo por username/correo/id (id o nombre de grupo)"
