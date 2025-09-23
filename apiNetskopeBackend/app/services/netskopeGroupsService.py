@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app.config import settings
 
@@ -42,7 +43,6 @@ def _find_user_id(identifier: str, *, timeout: int = 25) -> Optional[str]:
     if not ident:
         return None
 
-    # parece UUID
     if len(ident) >= 32 and ident.count("-") >= 4:
         return ident
 
@@ -87,12 +87,9 @@ def _resolve_user_ids(identifiers: Optional[List[str]], *, timeout: int = 25) ->
     return out
 
 
-# ==================== Lectura ====================
+# ==================== Lectura base ====================
 
 def scim_list_groups(*, start_index: int = 1, count: int = 100, timeout: int = 25) -> Dict[str, Any]:
-    """
-    GET /api/v2/scim/Groups (paginado) - respuesta base (sin forzar members).
-    """
     url = f"{_base_scim_url()}/Groups"
     params = {"startIndex": start_index, "count": count}
     r = requests.get(url, headers=_scim_headers(), params=params, timeout=timeout)
@@ -107,10 +104,8 @@ def scim_get_group_by_id(
     attributes: Optional[str] = None,
     excluded_attributes: Optional[str] = None,
     timeout: int = 25,
+    session: Optional[requests.Session] = None,
 ) -> Dict[str, Any]:
-    """
-    GET /api/v2/scim/Groups/{id}?attributes=...&excludedAttributes=...
-    """
     url = f"{_base_scim_url()}/Groups/{group_id}"
     params: Dict[str, str] = {}
     if attributes:
@@ -118,16 +113,14 @@ def scim_get_group_by_id(
     if excluded_attributes:
         params["excludedAttributes"] = excluded_attributes
 
-    r = requests.get(url, headers=_scim_headers(), params=params, timeout=timeout)
+    sess = session or requests
+    r = sess.get(url, headers=_scim_headers(), params=params, timeout=timeout)
     if r.status_code != 200:
         raise Exception(f"Error {r.status_code} al leer grupo {group_id}: {r.text}")
     return r.json()
 
 
 def scim_get_group_by_name(name: str, *, timeout: int = 25) -> Optional[Dict[str, Any]]:
-    """
-    Devuelve el grupo (sin expandir miembros). Preferimos volver por ID canónico.
-    """
     list_url = f"{_base_scim_url()}/Groups"
     params = {"filter": f'displayName eq "{name}"', "startIndex": 1, "count": 1}
     r = requests.get(list_url, headers=_scim_headers(), params=params, timeout=timeout)
@@ -143,9 +136,6 @@ def scim_get_group_by_name(name: str, *, timeout: int = 25) -> Optional[Dict[str
 
 
 def scim_get_group_by_name_with_members(name: str, *, timeout: int = 25) -> Optional[Dict[str, Any]]:
-    """
-    Igual que scim_get_group_by_name pero con attributes=members.
-    """
     list_url = f"{_base_scim_url()}/Groups"
     params = {"filter": f'displayName eq "{name}"', "startIndex": 1, "count": 1}
     r = requests.get(list_url, headers=_scim_headers(), params=params, timeout=timeout)
@@ -156,60 +146,132 @@ def scim_get_group_by_name_with_members(name: str, *, timeout: int = 25) -> Opti
     gid = _first_resource_id(payload)
     if not gid:
         resources = payload.get("Resources", []) if isinstance(payload, dict) else []
-        # si no hay id, devolvemos el crudo pero garantizamos 'members'
         if resources:
             g = dict(resources[0])
-            if "members" not in g:
-                g["members"] = []
+            g.setdefault("members", [])
             return g
         return None
     try:
         return scim_get_group_by_id(gid, attributes="members", timeout=timeout)
     except Exception:
-        # fallback: grupo base con members: []
         g = scim_get_group_by_id(gid, timeout=timeout)
-        if "members" not in g:
-            g["members"] = []
+        g.setdefault("members", [])
         return g
 
 
-# --- NUEVO: listar grupos y forzar members en cada Resource ---
+# ==================== Listado con MEMBERS optimizado ====================
+
+def _list_groups_try_expand_members_fast(
+    *,
+    start_index: int,
+    count: int,
+    timeout: int
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Primer intento: pedir /Groups con attributes=id,displayName,members
+    Si ya viene 'members' en los Resources -> éxito (True, payload).
+    Si no (o el tenant no soporta attributes) -> False, payload_base.
+    """
+    url = f"{_base_scim_url()}/Groups"
+    params = {
+        "startIndex": start_index,
+        "count": count,
+        # pedir solo lo que necesitamos para bajar payload
+        "attributes": "id,displayName,members",
+    }
+    r = requests.get(url, headers=_scim_headers(), params=params, timeout=timeout)
+    if r.status_code != 200:
+        # volvemos al listado normal
+        return False, scim_list_groups(start_index=start_index, count=count, timeout=timeout)
+
+    payload = r.json()
+    resources = payload.get("Resources", []) if isinstance(payload, dict) else []
+    if not resources:
+        return True, payload  # vacío pero válido
+
+    # Si al menos un recurso trae el atributo members, asumimos que el tenant lo soporta
+    has_members = any(isinstance(rc, dict) and "members" in rc for rc in resources)
+    if has_members:
+        # Aseguramos que todos tengan el atributo (aunque sea vacío)
+        for rc in resources:
+            if isinstance(rc, dict) and "members" not in rc:
+                rc["members"] = []
+        return True, payload
+
+    # No trajo members -> no soporta attributes=members
+    base = scim_list_groups(start_index=start_index, count=count, timeout=timeout)
+    return False, base
+
 
 def scim_list_groups_with_members(
     *,
     start_index: int = 1,
     count: int = 100,
-    timeout: int = 25
+    timeout: int = 25,
+    max_workers: int = 8,
 ) -> Dict[str, Any]:
     """
-    Devuelve el mismo contenedor SCIM de /Groups pero cada Resource incluye 'members'.
-    Si la expansión members falla para un grupo, se devuelve el grupo base con members=[].
+    Devuelve /Groups con 'members' en cada Resource, optimizado:
+      1) intenta /Groups?attributes=id,displayName,members
+      2) si no trae members, hace GET /Groups/{id}?attributes=members en paralelo (hilo)
     """
-    base = scim_list_groups(start_index=start_index, count=count, timeout=timeout)
-    resources = base.get("Resources", []) if isinstance(base, dict) else []
+    # Primer intento: traer todo con attributes
+    ok, payload = _list_groups_try_expand_members_fast(
+        start_index=start_index, count=count, timeout=timeout
+    )
+    if ok:
+        return payload
+
+    # Plan B: paralelizar por id
+    resources = payload.get("Resources", []) if isinstance(payload, dict) else []
     out_resources: List[Dict[str, Any]] = []
+    if not resources:
+        payload["Resources"] = out_resources
+        return payload
 
-    for g in resources:
-        gid = (g.get("id") or "").strip() if isinstance(g, dict) else ""
-        if not gid:
-            # recurso inválido, pero mantenemos contrato y añadimos members=[]
-            gg = dict(g)
-            gg.setdefault("members", [])
-            out_resources.append(gg)
-            continue
+    # bounding de workers
+    workers = max(1, min(int(max_workers), 32, len(resources)))
 
-        try:
-            full = scim_get_group_by_id(gid, attributes="members", timeout=timeout)
-        except Exception:
-            full = scim_get_group_by_id(gid, timeout=timeout)
-            full.setdefault("members", [])
-        out_resources.append(full)
+    headers = _scim_headers()
+    with requests.Session() as session:
+        session.headers.update(headers)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {}
+            for g in resources:
+                gid = (g.get("id") or "").strip() if isinstance(g, dict) else ""
+                if not gid:
+                    gg = dict(g)
+                    gg.setdefault("members", [])
+                    out_resources.append(gg)
+                    continue
+                fut = pool.submit(
+                    scim_get_group_by_id,
+                    gid,
+                    attributes="members",
+                    timeout=timeout,
+                    session=session,
+                )
+                futures[fut] = g
 
-    base["Resources"] = out_resources
-    return base
+            for fut in as_completed(futures):
+                base_group = futures[fut]
+                try:
+                    full = fut.result()
+                    # nos quedamos con el objeto "full"
+                    # (trae id/displayName + members)
+                    full.setdefault("members", [])
+                    out_resources.append(full)
+                except Exception:
+                    # si falla, devolvemos el base con members:[]
+                    gg = dict(base_group)
+                    gg.setdefault("members", [])
+                    out_resources.append(gg)
+
+    payload["Resources"] = out_resources
+    return payload
 
 
-# ==================== Crear / Borrar ====================
+# ==================== Crear / Borrar / Patch (sin cambios) ====================
 
 def scim_create_group(group_name: str, member_ids: Optional[List[str]] = None, *, timeout: int = 30) -> Dict[str, Any]:
     url = f"{_base_scim_url()}/Groups"
@@ -265,8 +327,6 @@ def scim_delete_group(group_id: Optional[str] = None, name: Optional[str] = None
         raise Exception(f"Error {resp.status_code} al eliminar grupo {_id}: {resp.text}")
     return {"status_code": resp.status_code, "id": _id}
 
-
-# ==================== Patch (editar) ====================
 
 def _resolve_group_id(group_id: Optional[str], name: Optional[str], *, timeout: int) -> str:
     gid = (group_id or "").strip()
