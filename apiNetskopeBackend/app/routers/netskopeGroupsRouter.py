@@ -2,10 +2,9 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from app.services.netskopeGroupsService import (
-    scim_list_groups,
-    scim_get_group_by_name,               # sin miembros
-    scim_get_group_by_name_with_members,  # con members (flag requerido)
-    scim_create_group_with_members,       # crear por nombre + miembros (username/correo/id)
+    scim_list_groups_with_members,   # <- NUEVO: lista y siempre trae members
+    scim_get_group_by_name_with_members,  # <- siempre trae members
+    scim_create_group_with_members,
     scim_delete_group,
     scim_patch_group,
     scim_remove_user_from_group,
@@ -16,30 +15,36 @@ router = APIRouter(prefix="/Gamma", tags=["Gamma - Groups"])
 
 # ------------------------------------------------------------------
 # GET /Gamma/groups
-# - Si envías 'name': devuelve ese grupo (opcional include_members=true)
-# - Si NO envías 'name': lista todos los grupos (paginado)
+# - Si envías 'name': devuelve ese grupo **SIEMPRE con members**.
+# - Si NO envías 'name': lista **todos** los grupos (paginado) **con members**.
 # ------------------------------------------------------------------
-@router.get("/groups", summary="Lista grupos o devuelve uno por displayName")
+@router.get("/groups", summary="Lista grupos (siempre con members) o devuelve uno por displayName")
 def get_groups(
     name: Optional[str] = Query(
         default=None,
-        description='displayName exacto. Si no se envía, se listan todos los grupos.'
-    ),
-    include_members: bool = Query(
-        default=False,
-        description="Si name está presente y true, usa attributes=members (requiere flag SCIM activado)."
+        description='displayName exacto. Si no se envía, se listan todos los grupos (con members).'
     ),
     start_index: int = Query(1, ge=1, description="Paginación cuando no se envía 'name'"),
     count: int = Query(100, ge=1, le=1000, description="Paginación cuando no se envía 'name'"),
 ):
     try:
         if name:
-            g = scim_get_group_by_name_with_members(name) if include_members else scim_get_group_by_name(name)
+            g = scim_get_group_by_name_with_members(name)
             if not g:
                 raise HTTPException(status_code=404, detail=f"No se encontró el grupo '{name}'")
+            # Garantizar atributo members presente
+            if "members" not in g:
+                g["members"] = []
             return g
-        # Sin 'name' -> listar
-        return scim_list_groups(start_index=start_index, count=count)
+
+        # Sin 'name' -> listar todos con members
+        data = scim_list_groups_with_members(start_index=start_index, count=count)
+        # Garantizar members en cada recurso
+        if isinstance(data, dict):
+            for r in data.get("Resources", []) or []:
+                if "members" not in r:
+                    r["members"] = []
+        return data
     except HTTPException:
         raise
     except Exception as e:
@@ -92,7 +97,6 @@ def patch_group(
     name:     Optional[str] = Query(default=None, description="displayName del grupo"),
     add_members:    Optional[List[str]] = Query(default=None, description="Usernames/correos/IDs a agregar"),
     remove_members: Optional[List[str]] = Query(default=None, description="Usernames/correos/IDs a quitar"),
-    # Compatibilidad: si realmente quieres pasar IDs directos
     add_member_ids:    Optional[List[str]] = Query(default=None, description="IDs a agregar (opcional)"),
     remove_member_ids: Optional[List[str]] = Query(default=None, description="IDs a quitar (opcional)"),
     new_display_name:  Optional[str]       = Query(default=None, description="Nuevo displayName"),
