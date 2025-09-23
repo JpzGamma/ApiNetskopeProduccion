@@ -20,9 +20,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Tooltip,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import AddIcon from "@mui/icons-material/Add";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 
@@ -53,6 +55,10 @@ export default function Groups() {
   }>({ displayName: "" });
   const [membersInput, setMembersInput] = useState("");
   const [removeMembersInput, setRemoveMembersInput] = useState("");
+
+  // Modal "Ver grupo"
+  const [openViewModal, setOpenViewModal] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<GroupType | null>(null);
 
   useEffect(() => {
     fetchGroups();
@@ -104,13 +110,19 @@ export default function Groups() {
           membersInput ? membersInput.split(",") : [],
           removeMembersInput ? removeMembersInput.split(",") : []
         );
-        setFeedbackMsg({ type: "success", message: "Grupo actualizado con éxito" });
+        setFeedbackMsg({
+          type: "success",
+          message: "Grupo actualizado con éxito",
+        });
       } else {
         await createGroupService(
           formData.displayName,
           membersInput ? membersInput.split(",") : []
         );
-        setFeedbackMsg({ type: "success", message: "Grupo creado con éxito" });
+        setFeedbackMsg({
+          type: "success",
+          message: "Grupo creado con éxito",
+        });
       }
 
       handleCloseModal();
@@ -125,7 +137,7 @@ export default function Groups() {
     }
   };
 
-  const handleDelete = async (group: GroupType) => {
+  const handleDeleteGroup = async (group: GroupType) => {
     if (!window.confirm("¿Seguro que deseas eliminar este grupo?")) return;
 
     setLoading(true);
@@ -137,6 +149,42 @@ export default function Groups() {
       setFeedbackMsg({
         type: "error",
         message: error?.message || "Error eliminando grupo",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewGroup = (group: GroupType) => {
+    setSelectedGroup(group);
+    setOpenViewModal(true);
+  };
+
+  const handleRemoveMember = async (memberValue: string) => {
+    if (!selectedGroup) return;
+    if (!window.confirm(`¿Seguro que deseas eliminar a ${memberValue}?`)) return;
+
+    setLoading(true);
+    try {
+      await updateGroupService(
+        selectedGroup.id,
+        selectedGroup.displayName,
+        undefined,
+        [],
+        [memberValue]
+      );
+      setFeedbackMsg({
+        type: "success",
+        message: "Miembro eliminado con éxito",
+      });
+      await fetchGroups();
+      // Actualizar modal
+      const updated = groups.find((g) => g.id === selectedGroup.id);
+      if (updated) setSelectedGroup(updated);
+    } catch (error: any) {
+      setFeedbackMsg({
+        type: "error",
+        message: error?.message || "Error eliminando miembro",
       });
     } finally {
       setLoading(false);
@@ -158,7 +206,8 @@ export default function Groups() {
         alignItems: "center",
         justifyContent: "center",
         p: 2,
-        background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+        background:
+          "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
       }}
     >
       <Box
@@ -169,7 +218,8 @@ export default function Groups() {
           maxWidth: 1000,
           width: "100%",
           p: 3,
-          background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+          background:
+            "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
         }}
       >
         <Card elevation={0} sx={{ background: "transparent", boxShadow: "none" }}>
@@ -231,7 +281,10 @@ export default function Groups() {
                 <CircularProgress />
               </Box>
             ) : (
-              <TableContainer component={Paper} sx={{ maxHeight: 400, mb: 3, overflowX: "auto" }}>
+              <TableContainer
+                component={Paper}
+                sx={{ maxHeight: 400, mb: 3, overflowX: "auto" }}
+              >
                 <Table stickyHeader size="small" sx={{ minWidth: 800 }}>
                   <TableHead>
                     <TableRow>
@@ -243,7 +296,7 @@ export default function Groups() {
                   <TableBody>
                     {filteredGroups.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} align="center">
+                        <TableCell colSpan={3} align="center">
                           No se encontraron grupos
                         </TableCell>
                       </TableRow>
@@ -257,12 +310,30 @@ export default function Groups() {
                               : "-"}
                           </TableCell>
                           <TableCell align="center">
-                            <IconButton color="primary" onClick={() => handleOpenModal(g)}>
-                              <EditIcon />
-                            </IconButton>
-                            <IconButton color="error" onClick={() => handleDelete(g)}>
-                              <DeleteIcon />
-                            </IconButton>
+                            <Tooltip title="Ver">
+                              <IconButton
+                                onClick={() => handleViewGroup(g)}
+                                color="primary"
+                              >
+                                <VisibilityIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Editar">
+                              <IconButton
+                                onClick={() => handleOpenModal(g)}
+                                sx={{ color: "#FFA726" }}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Eliminar">
+                              <IconButton
+                                onClick={() => handleDeleteGroup(g)}
+                                color="error"
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Tooltip>
                           </TableCell>
                         </TableRow>
                       ))
@@ -313,7 +384,9 @@ export default function Groups() {
             label="Nombre del grupo *"
             fullWidth
             value={formData.displayName}
-            onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, displayName: e.target.value })
+            }
             disabled={isEditing}
           />
           {isEditing && (
@@ -322,7 +395,9 @@ export default function Groups() {
               label="Nuevo nombre (opcional)"
               fullWidth
               value={formData.newDisplayName || ""}
-              onChange={(e) => setFormData({ ...formData, newDisplayName: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, newDisplayName: e.target.value })
+              }
             />
           )}
           <TextField
@@ -347,6 +422,52 @@ export default function Groups() {
           <Button variant="contained" onClick={handleSubmit}>
             {isEditing ? "Actualizar" : "Crear"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal Ver grupo */}
+      <Dialog
+        open={openViewModal}
+        onClose={() => setOpenViewModal(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Detalles del Grupo</DialogTitle>
+        <DialogContent>
+          <Typography variant="h6" gutterBottom>
+            {selectedGroup?.displayName}
+          </Typography>
+
+          {selectedGroup?.members && selectedGroup.members.length > 0 ? (
+            <Box sx={{ mt: 1 }}>
+              {selectedGroup.members.map((m) => (
+                <Box
+                  key={m.value}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderBottom: "1px solid #e0e0e0",
+                    py: 1,
+                  }}
+                >
+                  <Typography>{m.display}</Typography>
+                  <IconButton
+                    edge="end"
+                    color="error"
+                    onClick={() => handleRemoveMember(m.value)}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <Typography>Sin miembros</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenViewModal(false)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
 
