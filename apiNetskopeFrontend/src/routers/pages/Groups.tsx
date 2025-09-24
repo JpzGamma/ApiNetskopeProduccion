@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Button,
@@ -178,7 +178,6 @@ export default function Groups() {
         message: "Miembro eliminado con éxito",
       });
       await fetchGroups();
-      // Actualizar modal
       const updated = groups.find((g) => g.id === selectedGroup.id);
       if (updated) setSelectedGroup(updated);
     } catch (error: any) {
@@ -191,11 +190,15 @@ export default function Groups() {
     }
   };
 
-  const filteredGroups = search
-    ? groups.filter((g) =>
-        g.displayName.toLowerCase().includes(search.toLowerCase())
-      )
-    : groups;
+  // —— Filtro robusto: evita crashear si falta displayName ——
+  const filteredGroups = useMemo(() => {
+    const needle = (search || "").toLowerCase().trim();
+    if (!needle) return groups;
+    return groups.filter((g) => {
+      const safeName = (g?.displayName || "").toLowerCase();
+      return safeName.includes(needle);
+    });
+  }, [search, groups]);
 
   return (
     <Box
@@ -302,11 +305,13 @@ export default function Groups() {
                       </TableRow>
                     ) : (
                       filteredGroups.map((g) => (
-                        <TableRow key={g.id}>
-                          <TableCell>{g.displayName}</TableCell>
-                          <TableCell>
-                            {g.members && g.members.length > 0
-                              ? g.members.map((m) => m.display).join(", ")
+                        <TableRow key={g.id || g.displayName}>
+                          <TableCell>{g.displayName || "(sin nombre)"}</TableCell>
+                          <TableCell sx={{ maxWidth: 520 }}>
+                            {Array.isArray(g.members) && g.members.length > 0
+                              ? g.members
+                                  .map((m) => (m?.display || m?.value || "—"))
+                                  .join(", ")
                               : "-"}
                           </TableCell>
                           <TableCell align="center">
@@ -435,7 +440,7 @@ export default function Groups() {
         <DialogTitle>Detalles del Grupo</DialogTitle>
         <DialogContent>
           <Typography variant="h6" gutterBottom>
-            {selectedGroup?.displayName}
+            {selectedGroup?.displayName || "(sin nombre)"}
           </Typography>
 
           {selectedGroup?.members && selectedGroup.members.length > 0 ? (
@@ -451,7 +456,7 @@ export default function Groups() {
                     py: 1,
                   }}
                 >
-                  <Typography>{m.display}</Typography>
+                  <Typography>{m.display || m.value || "—"}</Typography>
                   <IconButton
                     edge="end"
                     color="error"
