@@ -1,12 +1,14 @@
+# app/services/netskopeGroupsService.py
 from __future__ import annotations
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
+import concurrent.futures as futures
 import requests
 
 from app.config import settings
 
 
-# ==================== Helpers ====================
+# ==================== Config / Helpers HTTP ====================
 
 def _scim_headers() -> Dict[str, str]:
     tenant = settings.NETSKOPE_TENANT_GAMMA
@@ -35,14 +37,20 @@ def _first_resource_id(payload: Any) -> Optional[str]:
     return None
 
 
-# ---------- Resolver de usuarios (username/email/id) -> ID ----------
+# ==================== Resolución de usuarios (username/email/id) ====================
 
 def _find_user_id(identifier: str, *, timeout: int = 25) -> Optional[str]:
+    """
+    Dado un username, correo o ID, intenta devolver el ID SCIM del usuario.
+    - Si parece UUID, lo devuelve tal cual.
+    - Si contiene '@' intenta emails.value eq "...", luego userName eq "...", luego externalId eq "..."
+    - Si no contiene '@', intenta userName eq "...", luego externalId eq "..."
+    """
     ident = (identifier or "").strip()
     if not ident:
         return None
 
-    # parece UUID
+    # parece UUID (heurística simple)
     if len(ident) >= 32 and ident.count("-") >= 4:
         return ident
 
@@ -71,10 +79,14 @@ def _find_user_id(identifier: str, *, timeout: int = 25) -> Optional[str]:
             uid = _first_resource_id(r.json())
             if uid:
                 return uid
+        # 400 = filtro no soportado -> sigue al siguiente
     return None
 
 
 def _resolve_user_ids(identifiers: Optional[List[str]], *, timeout: int = 25) -> List[str]:
+    """
+    Recibe lista de usernames / correos / ids y devuelve lista de IDs (únicos).
+    """
     if not identifiers:
         return []
     seen: set[str] = set()
@@ -87,11 +99,12 @@ def _resolve_user_ids(identifiers: Optional[List[str]], *, timeout: int = 25) ->
     return out
 
 
-# ==================== Lectura ====================
+# ==================== Lectura: básico ====================
 
-def scim_list_groups(*, start_index: int = 1, count: int = 100, timeout: int = 25) -> Dict[str, Any]:
+def scim_list_groups_page(*, start_index: int = 1, count: int = 100, timeout: int = 25) -> Dict[str, Any]:
     """
     GET /api/v2/scim/Groups (paginado) - respuesta base (sin forzar members).
+    Devuelve el contenedor SCIM con Resources de esa página.
     """
     url = f"{_base_scim_url()}/Groups"
     params = {"startIndex": start_index, "count": count}
@@ -124,27 +137,11 @@ def scim_get_group_by_id(
     return r.json()
 
 
-def scim_get_group_by_name(name: str, *, timeout: int = 25) -> Optional[Dict[str, Any]]:
+def scim_get_group_by_name(name: str, *, with_members: bool = False, timeout: int = 25) -> Optional[Dict[str, Any]]:
     """
-    Devuelve el grupo (sin expandir miembros). Preferimos volver por ID canónico.
-    """
-    list_url = f"{_base_scim_url()}/Groups"
-    params = {"filter": f'displayName eq "{name}"', "startIndex": 1, "count": 1}
-    r = requests.get(list_url, headers=_scim_headers(), params=params, timeout=timeout)
-    if r.status_code != 200:
-        raise Exception(f"Error {r.status_code} al filtrar grupos: {r.text}")
-
-    payload = r.json()
-    gid = _first_resource_id(payload)
-    if not gid:
-        resources = payload.get("Resources", []) if isinstance(payload, dict) else []
-        return resources[0] if resources else None
-    return scim_get_group_by_id(gid, timeout=timeout)
-
-
-def scim_get_group_by_name_with_members(name: str, *, timeout: int = 25) -> Optional[Dict[str, Any]]:
-    """
-    Igual que scim_get_group_by_name pero con attributes=members.
+    GET /api/v2/scim/Groups?filter=displayName eq "<name>"
+    - Si with_members=True, intenta /Groups/{id}?attributes=members
+    - Si no hay id, devuelve el resource crudo; garantiza 'members'=[]
     """
     list_url = f"{_base_scim_url()}/Groups"
     params = {"filter": f'displayName eq "{name}"', "startIndex": 1, "count": 1}
@@ -156,68 +153,121 @@ def scim_get_group_by_name_with_members(name: str, *, timeout: int = 25) -> Opti
     gid = _first_resource_id(payload)
     if not gid:
         resources = payload.get("Resources", []) if isinstance(payload, dict) else []
-        # si no hay id, devolvemos el crudo pero garantizamos 'members'
-        if resources:
-            g = dict(resources[0])
-            if "members" not in g:
-                g["members"] = []
-            return g
-        return None
-    try:
-        return scim_get_group_by_id(gid, attributes="members", timeout=timeout)
-    except Exception:
-        # fallback: grupo base con members: []
-        g = scim_get_group_by_id(gid, timeout=timeout)
-        if "members" not in g:
+        if not resources:
+            return None
+        g = dict(resources[0])
+        if with_members and "members" not in g:
             g["members"] = []
         return g
 
+    if with_members:
+        try:
+            g = scim_get_group_by_id(gid, attributes="members", timeout=timeout)
+        except Exception:
+            g = scim_get_group_by_id(gid, timeout=timeout)
+            g.setdefault("members", [])
+        return g
+    else:
+        return scim_get_group_by_id(gid, timeout=timeout)
 
-# --- NUEVO: listar grupos y forzar members en cada Resource ---
 
-def scim_list_groups_with_members(
+# ==================== Lectura: todos los grupos con members (rápido) ====================
+
+def _expand_group_members(group: Dict[str, Any], timeout: int) -> Dict[str, Any]:
+    """
+    Dado un recurso de grupo (con id), devuelve el grupo con 'members' garantizado.
+    """
+    gid = (group.get("id") or "").strip() if isinstance(group, dict) else ""
+    if not gid:
+        gg = dict(group)
+        gg.setdefault("members", [])
+        return gg
+
+    try:
+        full = scim_get_group_by_id(gid, attributes="members", timeout=timeout)
+    except Exception:
+        full = scim_get_group_by_id(gid, timeout=timeout)
+        full.setdefault("members", [])
+    return full
+
+
+def scim_list_all_groups_with_members(
     *,
-    start_index: int = 1,
-    count: int = 100,
+    page_size: int = 200,
+    max_workers: int = 16,
     timeout: int = 25
 ) -> Dict[str, Any]:
     """
-    Devuelve el mismo contenedor SCIM de /Groups pero cada Resource incluye 'members'.
-    Si la expansión members falla para un grupo, se devuelve el grupo base con members=[].
+    Recorre todas las páginas de /Groups y trae 'members' para cada grupo **en paralelo**.
+    Devuelve un contenedor SCIM con:
+      - Resources: todos los grupos con members[]
+      - totalResults, itemsPerPage, startIndex=1
     """
-    base = scim_list_groups(start_index=start_index, count=count, timeout=timeout)
-    resources = base.get("Resources", []) if isinstance(base, dict) else []
+    if page_size < 1 or page_size > 1000:
+        page_size = 200
+    if max_workers < 1:
+        max_workers = 1
+    if max_workers > 32:
+        max_workers = 32
+
+    # 1) obtener primera página para conocer totalResults
+    first = scim_list_groups_page(start_index=1, count=page_size, timeout=timeout)
+    total = int(first.get("totalResults", 0)) if isinstance(first, dict) else 0
+    resources = list(first.get("Resources", []) or [])
+
+    # 2) si hay más páginas, las traemos en serie (rápido) solo de IDs
+    #    (traer todas las páginas en paralelo no suele ganar mucho y complica el rate-limit)
+    next_index = 1 + page_size
+    while next_index <= total:
+        pg = scim_list_groups_page(start_index=next_index, count=page_size, timeout=timeout)
+        resources.extend(pg.get("Resources", []) or [])
+        next_index += page_size
+
+    # 3) expandir members en paralelo
     out_resources: List[Dict[str, Any]] = []
+    if not resources:
+        return {"Resources": [], "totalResults": 0, "itemsPerPage": page_size, "startIndex": 1}
 
-    for g in resources:
-        gid = (g.get("id") or "").strip() if isinstance(g, dict) else ""
-        if not gid:
-            # recurso inválido, pero mantenemos contrato y añadimos members=[]
-            gg = dict(g)
-            gg.setdefault("members", [])
-            out_resources.append(gg)
-            continue
+    with futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futs = [pool.submit(_expand_group_members, g, timeout) for g in resources]
+        for f in futures.as_completed(futs):
+            try:
+                out_resources.append(f.result())
+            except Exception:
+                # Si algo falla, devolvemos el grupo "tal cual" con members=[]
+                out_resources.append({"members": []})
 
-        try:
-            full = scim_get_group_by_id(gid, attributes="members", timeout=timeout)
-        except Exception:
-            full = scim_get_group_by_id(gid, timeout=timeout)
-            full.setdefault("members", [])
-        out_resources.append(full)
-
-    base["Resources"] = out_resources
-    return base
+    # 4) armar contenedor SCIM
+    return {
+        "Resources": out_resources,
+        "totalResults": len(out_resources),
+        "itemsPerPage": page_size,
+        "startIndex": 1,
+    }
 
 
 # ==================== Crear / Borrar ====================
 
-def scim_create_group(group_name: str, member_ids: Optional[List[str]] = None, *, timeout: int = 30) -> Dict[str, Any]:
+def scim_create_group(
+    group_name: str,
+    member_ids: Optional[List[str]] = None,  # acepta usernames/correos/ids; se resuelven
+    *,
+    timeout: int = 30,
+) -> Dict[str, Any]:
+    """
+    Crea un grupo SCIM con displayName = group_name.
+    'member_ids' puede contener usernames/correos/ids; se resolverán a IDs reales.
+    """
     url = f"{_base_scim_url()}/Groups"
 
+    # resolver a IDs SCIM
+    ids = _resolve_user_ids(member_ids, timeout=timeout)
+
+    # normalizar (únicos)
     norm_ids: List[str] = []
-    if member_ids:
+    if ids:
         seen = set()
-        for m in member_ids:
+        for m in ids:
             v = (m or "").strip()
             if v and v not in seen:
                 seen.add(v)
@@ -237,22 +287,15 @@ def scim_create_group(group_name: str, member_ids: Optional[List[str]] = None, *
     return resp.json()
 
 
-def scim_create_group_with_members(
-    group_name: str,
-    members: Optional[List[str]] = None,
-    *,
-    timeout: int = 30,
-) -> Dict[str, Any]:
-    ids = _resolve_user_ids(members, timeout=timeout)
-    return scim_create_group(group_name, member_ids=ids, timeout=timeout)
-
-
 def scim_delete_group(group_id: Optional[str] = None, name: Optional[str] = None, *, timeout: int = 25) -> Dict[str, Any]:
+    """
+    Elimina un grupo por ID o por displayName.
+    """
     _id = (group_id or "").strip()
     if not _id:
         if not name:
             raise ValueError("Debes proporcionar 'group_id' o 'name'")
-        found = scim_get_group_by_name(name, timeout=timeout)
+        found = scim_get_group_by_name(name, with_members=False, timeout=timeout)
         if not found:
             raise LookupError(f"No se encontró grupo con displayName '{name}'")
         _id = found.get("id")
@@ -274,7 +317,7 @@ def _resolve_group_id(group_id: Optional[str], name: Optional[str], *, timeout: 
         return gid
     if not name:
         raise ValueError("Debes enviar 'group_id' o 'name' (displayName)")
-    found = scim_get_group_by_name(name, timeout=timeout)
+    found = scim_get_group_by_name(name, with_members=False, timeout=timeout)
     if not found:
         raise LookupError(f"No se encontró grupo con displayName '{name}'")
     gid = (found.get("id") or "").strip()
@@ -287,13 +330,19 @@ def scim_patch_group(
     *,
     group_id: Optional[str] = None,
     name: Optional[str] = None,
-    add_member_ids: Optional[List[str]] = None,
-    remove_member_ids: Optional[List[str]] = None,
-    add_members: Optional[List[str]] = None,
-    remove_members: Optional[List[str]] = None,
+    add_member_ids: Optional[List[str]] = None,        # ids directos (opcional)
+    remove_member_ids: Optional[List[str]] = None,     # ids directos (opcional)
+    add_members: Optional[List[str]] = None,           # usernames/correos/ids
+    remove_members: Optional[List[str]] = None,        # usernames/correos/ids
     new_display_name: Optional[str] = None,
     timeout: int = 30,
 ) -> Dict[str, Any]:
+    """
+    PATCH /api/v2/scim/Groups/{id}
+    - add_members/remove_members aceptan usernames/correos/ids (se resuelven a IDs)
+    - add_member_ids/remove_member_ids aceptan ids directos
+    - new_display_name: renombra el grupo
+    """
     gid = _resolve_group_id(group_id, name, timeout=timeout)
 
     add_ids_resolved    = set(_resolve_user_ids(add_members,    timeout=timeout))
@@ -336,11 +385,14 @@ def scim_patch_group(
 
 def scim_remove_user_from_group(
     *,
-    member: str,
+    member: str,                                  # username / correo / id
     group_id: Optional[str] = None,
     name: Optional[str] = None,
     timeout: int = 25,
 ) -> Dict[str, Any]:
+    """
+    Elimina un miembro del grupo por username/correo/id.
+    """
     uid = _find_user_id(member, timeout=timeout)
     if not uid:
         raise LookupError(f"No se pudo resolver el usuario '{member}' a un ID SCIM")
