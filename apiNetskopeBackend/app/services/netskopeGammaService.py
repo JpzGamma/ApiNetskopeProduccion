@@ -45,31 +45,40 @@ def _is_valid_host_or_ip(netloc: str) -> bool:
 
 def _is_valid_wildcard(entry: str) -> bool:
     """
-    Acepta patrones comunes:
-      '*.example.com', 'example.com/*', '*.example.com/*'
+    Reglas de wildcard permitidas:
+      - ÚNICAMENTE '*.example.com'
+      - Sin puerto
+      - Sin path (cualquier '*' en el path => rechazado)
+      - No se permite wildcard sobre IP
     """
     e = entry.lower().strip()
     if not e:
         return False
 
+    # separar host/path (sin scheme)
     if "/" in e:
         netloc, path = e.split("/", 1)
         path = "/" + path if path and not path.startswith("/") else path
     else:
         netloc, path = e, ""
 
-    if netloc.startswith("*."):
-        base = netloc[2:]
-        if not _is_valid_host_or_ip(base):
-            return False
-    else:
-        if "*" in netloc:
-            return False
-        if not _is_valid_host_or_ip(netloc):
-            return False
-
-    if "*" in path and not path.endswith("/*"):
+    # No permitimos wildcard en path bajo ningún caso
+    if "*" in (path or ""):
         return False
+    if ":" in netloc:  # puerto con wildcard no permitido
+        return False
+
+    if not netloc.startswith("*."):
+        # cualquier otro uso de * en el host es inválido
+        return False
+
+    base = netloc[2:]  # después de "*."
+    # base debe ser un host de dominio (no IP)
+    if not _is_valid_host_or_ip(base):
+        return False
+    if _ipv4_re.match(base):
+        return False
+
     return True
 
 def _normalize_exact(s: str) -> Optional[str]:
@@ -81,11 +90,18 @@ def _normalize_exact(s: str) -> Optional[str]:
     return f"{netloc}{path}".lower()
 
 def bucketize_urls(urls: List[str], *, allow_regex: bool = False) -> Dict[str, List[str]]:
+    """
+    Clasifica en:
+      - exact          (host[/path] sin '*')
+      - wildcard       (SOLO '*.example.com' sin path)
+      - regex          (si allow_regex y contiene metacaracteres claros)
+      - rejected       (resto)
+    """
     out: Dict[str, List[str]] = {"exact": [], "wildcard": [], "regex": [], "rejected": []}
     seen_exact, seen_wild, seen_regex = set(), set(), set()
 
     for raw in urls or []:
-        if not isinstance(raw, str):
+        if not isinstance(raw, string_types := str):
             out["rejected"].append(str(raw)); continue
         s = raw.strip()
         if not s:
@@ -155,12 +171,6 @@ def get_url_list_type(list_id: int) -> str:
 
 # -------------------- Crear --------------------
 def create_url_list(name: str, urls: List[str], *, allow_regex: bool = False) -> dict:
-    """
-    POST /api/v2/policy/urllist
-    - No se permite crear vacías.
-    - Si allow_regex y hay regex válidas => se crea como 'regex'
-      de lo contrario se crea como 'exact' (exact + wildcard).
-    """
     if not isinstance(name, str) or not name.strip():
         raise ValueError("El nombre es requerido.")
 
@@ -183,6 +193,54 @@ def create_url_list(name: str, urls: List[str], *, allow_regex: bool = False) ->
         raise Exception(f"Error {resp.status_code} al crear URL List: {resp.text}")
     return {
         "created": resp.json(),
+        "accepted": {"exact": buckets["exact"], "wildcard_as_exact": buckets["wildcard"], "regex": buckets["regex"] if allow_regex else []},
+        "rejected": buckets["rejected"],
+        "type_used": chosen_type,
+        "sent": len(chosen_urls),
+    }
+
+# -------------------- PUT (reemplazo total) --------------------
+def put_url_list_by_id(
+    list_id: int,
+    *,
+    name: Optional[str] = None,
+    urls: Optional[List[str]] = None,
+    allow_regex: bool = False,
+) -> dict:
+    """
+    PUT /api/v2/policy/urllist/{id}
+    Reemplaza completamente: nombre (si viene) y URLs (validadas).
+    """
+    if urls is None or len(urls) == 0:
+        raise ValueError("Debes enviar al menos una URL para actualizar la lista.")
+
+    buckets = bucketize_urls(urls, allow_regex=allow_regex)
+    exact_like = (buckets["exact"] or []) + (buckets["wildcard"] or [])
+    use_regex = allow_regex and len(buckets["regex"]) > 0
+
+    if use_regex:
+        chosen_type, chosen_urls = "regex", buckets["regex"]
+    else:
+        chosen_type, chosen_urls = "exact", exact_like
+
+    if not chosen_urls:
+        raise ValueError("Ninguna URL válida tras la validación.")
+
+    payload = {
+        "name": name.strip() if isinstance(name, str) and name.strip() else None,
+        "data": {"type": chosen_type, "urls": chosen_urls},
+    }
+    # quitar name None para no renombrar si no se envía
+    if payload["name"] is None:
+        payload.pop("name", None)
+
+    url = f"{_tenant_base()}/api/v2/policy/urllist/{list_id}"
+    resp = requests.put(url, headers=_base_headers(), json=payload, timeout=40)
+    if resp.status_code not in (200, 201):
+        raise Exception(f"Error {resp.status_code} al hacer PUT de URL List {list_id}: {resp.text}")
+
+    return {
+        "put": resp.json(),
         "accepted": {"exact": buckets["exact"], "wildcard_as_exact": buckets["wildcard"], "regex": buckets["regex"] if allow_regex else []},
         "rejected": buckets["rejected"],
         "type_used": chosen_type,
