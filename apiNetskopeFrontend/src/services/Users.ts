@@ -13,11 +13,29 @@ export type UserType = {
 
 const BASE = "/Gamma/users";
 
-/** GET /Gamma/users */
-export async function fetchUsers(): Promise<UserType[]> {
-  const { data } = await api.get<any>(BASE);
+export type FetchUsersResponse = {
+  users: UserType[];
+  total: number;
+  startIndex: number;
+  itemsPerPage: number;
+};
 
-  return (data.Resources || []).map((u: any) => ({
+/** GET /Gamma/users (paginado o búsqueda por user_name) */
+export async function fetchUsersService(
+  opts: { startIndex?: number; count?: number; user_name?: string } = {},
+): Promise<FetchUsersResponse> {
+  const params = new URLSearchParams();
+  params.set("start_index", String(opts.startIndex ?? 1));
+  params.set("count", String(opts.count ?? 100));
+  if (opts.user_name && opts.user_name.trim()) {
+    params.set("user_name", opts.user_name.trim());
+    // Si prefieres fallback del backend cuando el filtro no esté soportado:
+    // params.set("fetch_all", "true");
+  }
+
+  const { data } = await api.get<any>(`${BASE}?${params.toString()}`);
+
+  const users: UserType[] = (data.Resources || []).map((u: any) => ({
     id: u.id,
     userName: u.userName,
     email: u.emails?.[0]?.value || "",
@@ -27,6 +45,13 @@ export async function fetchUsers(): Promise<UserType[]> {
     active: u.active,
     lastModified: u.meta?.lastModified,
   }));
+
+  return {
+    users,
+    total: Number(data.totalResults ?? users.length),
+    startIndex: Number(data.startIndex ?? 1),
+    itemsPerPage: Number(data.itemsPerPage ?? users.length),
+  };
 }
 
 /** POST /Gamma/users?user_name=...&email=...&... */
@@ -38,7 +63,6 @@ export async function createUser(user: UserType): Promise<void> {
   if (user.family_name) params.append("family_name", user.family_name);
   if (user.external_id) params.append("external_id", user.external_id);
   if (user.active !== undefined) params.append("active", String(user.active));
-
   await api.post(`${BASE}?${params.toString()}`);
 }
 
@@ -62,6 +86,5 @@ export async function deleteUser(user: UserType): Promise<void> {
   const params = new URLSearchParams();
   if (user.id) params.append("user_id", user.id);
   else params.append("user_name", user.userName);
-
   await api.delete(`${BASE}?${params.toString()}`);
 }

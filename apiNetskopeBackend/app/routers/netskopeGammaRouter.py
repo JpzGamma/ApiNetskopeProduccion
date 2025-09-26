@@ -6,7 +6,7 @@ from app.services.netskopeGammaService import (
     list_url_lists, count_url_lists, find_url_list_by_name,
     patch_url_list, deploy_url_lists, delete_url_list_by_id,
     delete_url_list_by_name, bucketize_urls, get_url_list_type,
-    create_url_list,
+    create_url_list, put_url_list_by_id,
 )
 
 router = APIRouter(prefix="/Gamma", tags=["Gamma-URL_List"])
@@ -33,6 +33,11 @@ class UrlListCreateIn(BaseModel):
     name: str = Field(..., min_length=1)
     urls: List[str] = Field(..., description="Listado (no puede ser vacío luego de validar)")
     allow_regex: bool = Field(False, description="Si hay regex, se creará la lista como 'regex'")
+
+class UrlListPutIn(BaseModel):
+    name: Optional[str] = Field(default=None, description="Nuevo nombre (opcional)")
+    urls: List[str] = Field(..., description="URLs para reemplazo total")
+    allow_regex: bool = Field(False, description="Tratar entradas regex si aparecen")
 
 # ---------- LISTAR / CONTAR ----------
 @router.get("/url-lists", summary="Lista de URL Lists (opcional: filtrar por nombre)")
@@ -62,6 +67,30 @@ def gamma_create_url_list(payload: UrlListCreateIn):
     try:
         created_info = create_url_list(payload.name, payload.urls, allow_regex=payload.allow_regex)
         out: Dict[str, Any] = {"create": created_info}
+        try:
+            out["deploy"] = deploy_url_lists()
+        except Exception as e:
+            out["deploy_error"] = str(e)
+        return out
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ---------- PUT (reemplazo; deploy siempre) ----------
+@router.put("/url-lists/{list_id}", summary="Reemplaza completamente una URL List (nombre y URLs).")
+def gamma_put_url_list(
+    list_id: int,
+    payload: UrlListPutIn,
+):
+    try:
+        result = put_url_list_by_id(
+            list_id,
+            name=payload.name,
+            urls=payload.urls,
+            allow_regex=payload.allow_regex,
+        )
+        out: Dict[str, Any] = {"put": result}
         try:
             out["deploy"] = deploy_url_lists()
         except Exception as e:
