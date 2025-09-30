@@ -6,8 +6,9 @@ from app.routers import auth
 from app.routers import netskopeGammaRouter
 from app.routers import netskopeCCIRouter
 from app.routers import netskopeUsersRouter
-from app.routers import netskopeGroupsRouter
+from app.routers import netskopePoliciesGroupRouter
 from app.routers import netskopePrivateAppsRouter
+from app.routers import netskopePoliciesRulesRouter
 from app.models import user
 from app.config import settings
 from app.routers.auth import get_current_user
@@ -19,11 +20,15 @@ app = FastAPI(
 )
 
 app.include_router(auth.router)
+
+app.include_router(netskopePoliciesGroupRouter.router,        dependencies=[Depends(get_current_user)])
+app.include_router(netskopePoliciesRulesRouter.router,        dependencies=[Depends(get_current_user)])
 app.include_router(netskopeGammaRouter.router,        dependencies=[Depends(get_current_user)])
 app.include_router(netskopeCCIRouter.router,          dependencies=[Depends(get_current_user)])
 app.include_router(netskopeUsersRouter.router,        dependencies=[Depends(get_current_user)])
 app.include_router(netskopeGroupsRouter.router,       dependencies=[Depends(get_current_user)])
 app.include_router(netskopePrivateAppsRouter.router,  dependencies=[Depends(get_current_user)])
+
 
 app.add_middleware(
     CORSMiddleware,

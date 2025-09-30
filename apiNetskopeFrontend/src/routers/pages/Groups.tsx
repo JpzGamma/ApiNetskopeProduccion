@@ -217,11 +217,46 @@ export default function Groups() {
       <Box sx={{ backgroundColor: "white", borderRadius: "12px", boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)", maxWidth: 1000, width: "100%", p: 3, background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)" }}>
         <Card elevation={0} sx={{ background: "transparent", boxShadow: "none" }}>
           <CardContent sx={{ textAlign: "center" }}>
-            <RouterLink to="/home">
-              <Box component="img" src="/LogoNetskopeAzul.jpeg" alt="Logo" sx={{ width: 70, height: 70, borderRadius: 6, boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)", mb: 2, mx: "auto" }} />
-            </RouterLink>
-            <Typography variant="h4" fontWeight={600} sx={{ mb: 1 }}>Groups</Typography>
-            <Typography variant="body1" sx={{ mb: 3, fontWeight: 500 }}>Total de grupos (tenant): {total}</Typography>
+            {/* Logo */}
+            <Box sx={{ display: 'flex', justifyContent: 'center',gap:3, mb: 3 }}>
+              <RouterLink to="/home">
+                <Box
+                  component="img"
+                  src="/LogoNetskopeAzul.jpeg"
+                  alt="Logo"
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 5,
+                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                    mb: 2,
+                    mx: "auto",
+                  }}
+                />
+              </RouterLink>
+              {/* Segundo Logo */}
+              <RouterLink to="/home">
+                <Box
+                  component="img"
+                  src="/LogoGamma.jpeg" 
+                  alt="Logo Nuevo"
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 5,
+                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                    mb: 2,
+                    mx: "auto",
+                  }}
+                />
+              </RouterLink>
+            </Box>
+            <Typography variant="h4" fontWeight={600} sx={{ mb: 1 }}>
+              Groups
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 3, fontWeight: 500 }}>
+              Total de grupos: {groups.length}
+            </Typography>
 
             <Box sx={{ display: "flex", justifyContent: "center", gap: 2, flexWrap: "wrap", mb: 3 }}>
               <TextField
@@ -327,6 +362,13 @@ export default function Groups() {
             </Box>
           </CardContent>
         </Card>
+        {/* Footer */}
+        <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
+          <Typography variant="body2">
+            &copy; 2025 Api - Netskope
+          </Typography>
+          Equipo de Desarrollo - Gamma Medellín
+        </Box>
       </Box>
 
       {/* Modal Crear/Editar */}
@@ -397,11 +439,6 @@ export default function Groups() {
           <Button onClick={() => setOpenViewModal(false)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
-
-      {/* Footer */}
-      <Box sx={{ mt: 2, textAlign: "center", color: "text.secondary" }}>
-        <Typography variant="body2">&copy; 2025 ApiNetskope</Typography>
-      </Box>
     </Box>
   );
 }

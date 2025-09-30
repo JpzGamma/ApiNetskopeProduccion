@@ -20,7 +20,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 
 // Icons
-import { Cloud, Group, Apps, Link as LinkIcon, Policy, Lock } from '@mui/icons-material';
+import { Cloud, Group, Apps, Link as LinkIcon, Lock, Policy  } from '@mui/icons-material';
 
 // Datos de tenants con íconos
 const tenants = [
@@ -28,8 +28,8 @@ const tenants = [
   { name: 'CCI - Apps', route: '/cciApps', icon: <Apps fontSize="large" /> },
   { name: 'Usuarios', route: '/Users', icon: <Group fontSize="large" /> },
   { name: 'Grupos', route: '/Groups', icon: <Cloud fontSize="large" /> },
-  { name: 'Políticas Real - Time', route: 'https://example5.com', icon: <Policy fontSize="large" /> },
-  { name: 'NPA - Private Apps', route: 'https://example6.com', icon: <Lock fontSize="large" /> },
+  { name: 'NPA - Private Apps', route: '/PrivateApps', icon: <Lock fontSize="large" /> },
+  { name: 'Políticas Real - Time', route: '/Policies', icon: <Policy fontSize="large" /> },
   { name: 'Eventos - SWG', route: 'https://example4.com', icon: <Cloud fontSize="large" /> },
 ];
 
@@ -97,7 +97,7 @@ export default function Homepage() {
         >
           <CardContent sx={{ p: 4, textAlign: 'center' }}>
             {/* Logo */}
-            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center',gap:3, mb: 3 }}>
               <RouterLink to="/home">
                 <Box
                   component="img"
@@ -106,7 +106,23 @@ export default function Homepage() {
                   sx={{
                     width: 80,
                     height: 80,
-                    borderRadius: 4,
+                    borderRadius: 5,
+                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                    mb: 2,
+                    mx: "auto",
+                  }}
+                />
+              </RouterLink>
+              {/* Segundo Logo */}
+              <RouterLink to="/home">
+                <Box
+                  component="img"
+                  src="/LogoGamma.jpeg" 
+                  alt="Logo Nuevo"
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 5,
                     boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
                     mb: 2,
                     mx: "auto",
@@ -114,6 +130,7 @@ export default function Homepage() {
                 />
               </RouterLink>
             </Box>
+            
 
             {/* Título de bienvenida */}
             <Typography variant="h4" fontWeight={600}>
@@ -243,13 +260,17 @@ export default function Homepage() {
               </Button>
             </Box>
           </CardContent>
+          {/* Footer */}
+        <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
+          <Typography variant="body2">
+            &copy; 2025 Api - Netskope
+          </Typography>
+          Equipo de Desarrollo - Gamma Medellín
+        </Box>
         </Card>
-      </Box>
+       </Box>
 
-      {/* Footer */}
-      <Box sx={{ mt: 3, textAlign: 'center', color: 'text.secondary' }}>
-        <Typography variant="body2">&copy; 2025 ApiNetskope</Typography>
-      </Box>
+      
     </Box>
   );
 }

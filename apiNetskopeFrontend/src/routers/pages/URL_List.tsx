@@ -344,21 +344,40 @@ export default function URL_List() {
       >
         <Card elevation={0} sx={{ background: "transparent", boxShadow: "none" }}>
           <CardContent sx={{ textAlign: "center" }}>
-            <RouterLink to="/home">
-              <Box
-                component="img"
-                src="/LogoNetskopeAzul.jpeg"
-                alt="Logo"
-                sx={{
-                  width: 70,
-                  height: 70,
-                  borderRadius: 6,
-                  boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
-                  mb: 2,
-                  mx: "auto",
-                }}
-              />
-            </RouterLink>
+            {/* Logo */}
+            <Box sx={{ display: 'flex', justifyContent: 'center',gap:3, mb: 3 }}>
+              <RouterLink to="/home">
+                <Box
+                  component="img"
+                  src="/LogoNetskopeAzul.jpeg"
+                  alt="Logo"
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 5,
+                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                    mb: 2,
+                    mx: "auto",
+                  }}
+                />
+              </RouterLink>
+              {/* Segundo Logo */}
+              <RouterLink to="/home">
+                <Box
+                  component="img"
+                  src="/LogoGamma.jpeg" 
+                  alt="Logo Nuevo"
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 5,
+                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                    mb: 2,
+                    mx: "auto",
+                  }}
+                />
+              </RouterLink>
+            </Box>
             <Typography variant="h4" fontWeight={600} sx={{ mb: 1 }}>
               URL Lists
             </Typography>
@@ -684,12 +703,14 @@ example.com/path/to/page`}
             </Box>
           </CardContent>
         </Card>
+        {/* Footer */}
+        <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
+          <Typography variant="body2">
+            &copy; 2025 Api - Netskope
+          </Typography>
+          Equipo de Desarrollo - Gamma Medellín
+        </Box>
       </Box>
-
-      <Box sx={{ mt: 2, textAlign: "center", color: "text.secondary" }}>
-        <Typography variant="body2">&copy; 2025 ApiNetskope</Typography>
-      </Box>
-
       {/* Modal ver/editar */}
       <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
         <DialogTitle>
