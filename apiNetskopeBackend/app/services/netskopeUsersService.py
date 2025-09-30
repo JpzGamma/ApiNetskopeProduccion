@@ -6,9 +6,17 @@ import requests
 from app.config import settings
 
 
-# ----------------- Helpers -----------------
-
 def _headers_scim() -> Dict[str, str]:
+    """
+    Summary:
+        Construye los headers para consumir el endpoint SCIM de Netskope.
+    Params:
+        None
+    Return:
+        Dict[str, str]: Encabezados con Authorization Bearer y media-type SCIM.
+    Raises:
+        RuntimeError: Si faltan NETSKOPE_TENANT_GAMMA o NETSKOPE_TOKEN_GAMMA.
+    """
     if not settings.NETSKOPE_TENANT_GAMMA:
         raise RuntimeError("NETSKOPE_TENANT_GAMMA no definido en .env")
     if not settings.NETSKOPE_TOKEN_GAMMA:
@@ -22,11 +30,31 @@ def _headers_scim() -> Dict[str, str]:
 
 
 def _scim_base() -> str:
+    """
+    Summary:
+        Devuelve la URL base del API SCIM para el tenant actual.
+    Params:
+        None
+    Return:
+        str: URL base de SCIM sin barra final, con sufijo '/api/v2/scim'.
+    """
     return settings.NETSKOPE_TENANT_GAMMA.rstrip("/") + "/api/v2/scim"
 
 
 def _do_search(filter_expr: str, start_index: int, count: int, *, timeout: int = 25) -> Dict[str, Any]:
-    """Hace GET /Users?filter=... con paginado simple."""
+    """
+    Summary:
+        Ejecuta una búsqueda SCIM con filtro y paginación simple.
+    Params:
+        filter_expr (str): Expresión SCIM de filtro (por ejemplo 'userName eq "alice"').
+        start_index (int): Índice inicial (1-based) para paginado.
+        count (int): Tamaño de página.
+        timeout (int): Timeout en segundos.
+    Return:
+        Dict[str, Any]: {'status': <int>, 'data': <json dict>}.
+    Raises:
+        Exception: Para códigos HTTP distintos de 200 o 400.
+    """
     url = f"{_scim_base()}/Users"
     params = {
         "filter": filter_expr,
@@ -34,14 +62,20 @@ def _do_search(filter_expr: str, start_index: int, count: int, *, timeout: int =
         "count": count,
     }
     resp = requests.get(url, headers=_headers_scim(), params=params, timeout=timeout)
-    # Algunos filtros no soportados devuelven 400; lo tratamos arriba donde se llama
     if resp.status_code not in (200, 400):
         raise Exception(f"Error {resp.status_code} consultando Users: {resp.text}")
     return {"status": resp.status_code, "data": resp.json() if resp.text else {}}
 
 
 def _merge_scim_list_payload(resources: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Normaliza un payload SCIM de respuesta con Resources."""
+    """
+    Summary:
+        Ensambla un payload SCIM tipo ListResponse a partir de recursos sueltos.
+    Params:
+        resources (List[Dict[str, Any]]): Lista de objetos de usuario SCIM.
+    Return:
+        Dict[str, Any]: Estructura SCIM con schemas, Resources y metadatos de paginado.
+    """
     return {
         "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
         "Resources": resources,
@@ -50,8 +84,6 @@ def _merge_scim_list_payload(resources: List[Dict[str, Any]]) -> Dict[str, Any]:
         "startIndex": 1,
     }
 
-
-# ----------------- Public API -----------------
 
 def scim_list_users(
     query: Optional[str] = None,
@@ -62,16 +94,18 @@ def scim_list_users(
     timeout: int = 25,
 ) -> Dict[str, Any]:
     """
-    Lista usuarios SCIM. Si 'query' tiene '@', se intenta buscar por email:
-      1) emails.value eq "<correo>"
-      2) userName eq "<correo>" (por si el tenant usa el email como UPN)
-      3) externalId eq "<correo>"
-    Si 'query' no tiene '@', se intenta:
-      1) userName eq "<valor>"
-      2) externalId eq "<valor>"
-
-    Si todas las búsquedas fallan y fetch_all=True, se trae todo por páginas y se filtra localmente.
-    Devuelve un payload SCIM con "Resources".
+    Summary:
+        Lista/filtra usuarios SCIM. Intenta búsquedas específicas y hace fallback a paginación completa si se solicita.
+    Params:
+        query (Optional[str]): userName o correo. Si contiene '@' se prioriza búsqueda por email; si no, por userName/externalId.
+        start_index (int): Índice inicial de paginado para llamada directa sin filtro.
+        count (int): Tamaño de página.
+        fetch_all (bool): Si True y no hubo match por filtro, pagina todo y filtra localmente.
+        timeout (int): Timeout por request.
+    Return:
+        Dict[str, Any]: Payload SCIM (ListResponse) con 'Resources'.
+    Raises:
+        Exception: Si la API devuelve códigos inesperados durante la paginación.
     """
     def _extract_resources(payload: Any) -> List[Dict[str, Any]]:
         if isinstance(payload, dict):
@@ -79,7 +113,6 @@ def scim_list_users(
         return []
 
     if not query:
-        # sin filtro -> página simple
         url = f"{_scim_base()}/Users"
         params = {"startIndex": start_index, "count": count}
         resp = requests.get(url, headers=_headers_scim(), params=params, timeout=timeout)
@@ -87,7 +120,6 @@ def scim_list_users(
             raise Exception(f"Error {resp.status_code} listando Users: {resp.text}")
         return resp.json()
 
-    # 1) intentos con filtros del servidor
     filters: List[str] = []
     if "@" in query:
         filters = [
@@ -107,9 +139,7 @@ def scim_list_users(
             resources = _extract_resources(r["data"])
             if resources:
                 return r["data"]
-        # status 400 => filtro no soportado; seguimos probando los demás
 
-    # 2) Fallback: traer todo (paginando) y filtrar localmente
     if fetch_all:
         all_resources: List[Dict[str, Any]] = []
         idx = 1
@@ -131,10 +161,10 @@ def scim_list_users(
                 break
 
         q_low = query.strip().lower()
+
         def _match(u: Dict[str, Any]) -> bool:
             uname = str(u.get("userName", "")).lower()
             if "@" in query:
-                # buscar por email en emails[*].value (cuando venga) y también por userName
                 emails = u.get("emails") or []
                 for e in emails:
                     if isinstance(e, dict) and str(e.get("value", "")).lower() == q_low:
@@ -146,7 +176,6 @@ def scim_list_users(
         filtered = [u for u in all_resources if _match(u)]
         return _merge_scim_list_payload(filtered)
 
-    # Nada encontrado
     return _merge_scim_list_payload([])
 
 
@@ -160,7 +189,22 @@ def scim_create_user(
     active: bool = True,
     timeout: int = 30,
 ) -> Dict[str, Any]:
-    """Crea un usuario SCIM mínimo (email + username)."""
+    """
+    Summary:
+        Crea un usuario SCIM con los campos mínimos y opcionales estándar.
+    Params:
+        email (str): Correo del usuario (emails[0].value, primary=True).
+        user_name (str): userName (UPN o correo).
+        given_name (Optional[str]): Nombre.
+        family_name (Optional[str]): Apellido.
+        external_id (Optional[str]): externalId del usuario.
+        active (bool): Estado activo/inactivo inicial.
+        timeout (int): Timeout por request.
+    Return:
+        Dict[str, Any]: JSON del usuario creado devuelto por SCIM.
+    Raises:
+        Exception: Para códigos HTTP distintos de 200 o 201.
+    """
     url = f"{_scim_base()}/Users"
     payload: Dict[str, Any] = {
         "active": active,
@@ -173,7 +217,6 @@ def scim_create_user(
         payload["userName"] = user_name
     if external_id:
         payload["externalId"] = external_id
-        
 
     resp = requests.post(url, headers=_headers_scim(), json=payload, timeout=timeout)
     if resp.status_code not in (200, 201):
@@ -182,7 +225,20 @@ def scim_create_user(
 
 
 def scim_delete_user(user_id: Optional[str] = None, user_name: Optional[str] = None, *, timeout: int = 25) -> Dict[str, Any]:
-    """Elimina por id o, si no hay id, localiza por userName."""
+    """
+    Summary:
+        Elimina un usuario por 'id'. Si no se provee, intenta resolver el 'id' buscando por 'userName'.
+    Params:
+        user_id (Optional[str]): Identificador SCIM del usuario.
+        user_name (Optional[str]): userName para resolver el id si no se envía 'user_id'.
+        timeout (int): Timeout por request.
+    Return:
+        Dict[str, Any]: {'status_code': <int>, 'id': <str>} con el id eliminado.
+    Raises:
+        ValueError: Si no se envía 'user_id' ni 'user_name'.
+        LookupError: Si no se encuentra el usuario por 'userName'.
+        Exception: Si la API devuelve códigos inesperados al borrar.
+    """
     _id = (user_id or "").strip()
     if not _id:
         if not user_name:
@@ -213,8 +269,24 @@ def scim_update_user_put(
     timeout: int = 30,
 ) -> Dict[str, Any]:
     """
-    PUT de reemplazo total (en Netskope el ejemplo es PUT).
-    Si sólo pasas campos parciales, se construye un payload mínimo seguro.
+    Summary:
+        Actualiza un usuario mediante PUT (reemplazo controlado). Si no se pasa 'user_id', resuelve usando 'user_name'.
+        Intenta preservar valores existentes leyendo el usuario actual antes de construir el payload.
+    Params:
+        user_id (Optional[str]): Identificador SCIM del usuario.
+        user_name (Optional[str]): userName para resolver el id si no se envía 'user_id'.
+        email (Optional[str]): Nuevo correo principal.
+        given_name (Optional[str]): Nuevo nombre.
+        family_name (Optional[str]): Nuevo apellido.
+        active (Optional[bool]): Estado activo/inactivo.
+        timeout (int): Timeout por request.
+    Return:
+        Dict[str, Any]: JSON del usuario actualizado.
+
+    Raises:
+        ValueError: Si no se envía 'user_id' ni 'user_name'.
+        LookupError: Si no se encuentra el usuario por 'userName'.
+        Exception: Si la API devuelve códigos inesperados al leer/actualizar.
     """
     _id = (user_id or "").strip()
     if not _id:
@@ -228,10 +300,8 @@ def scim_update_user_put(
         if not _id:
             raise Exception("El usuario no tiene 'id' en la respuesta")
 
-    # Construimos un reemplazo seguro (si no mandas algo, mantenemos valores "actuales" mínimos)
     current = {}
     try:
-        # lee user actual para no borrar campos importantes
         url_get = f"{_scim_base()}/Users/{_id}"
         r = requests.get(url_get, headers=_headers_scim(), timeout=timeout)
         if r.status_code == 200:

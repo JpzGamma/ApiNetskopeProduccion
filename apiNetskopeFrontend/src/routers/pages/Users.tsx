@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Box,
   Button,
@@ -21,6 +21,7 @@ import {
   DialogContent,
   DialogActions,
   Checkbox,
+  TablePagination,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import AddIcon from "@mui/icons-material/Add";
@@ -29,22 +30,38 @@ import DeleteIcon from "@mui/icons-material/Delete";
 
 import {
   type UserType,
-  fetchUsers,
+  fetchUsersService,
   createUser,
   updateUser,
   deleteUser,
 } from "../../services/Users";
 
+/** Debounce pequeño para no spamear re-render al escribir */
+function useDebounce<T>(value: T, delay = 250): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setV(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return v;
+}
+
 export default function Users() {
   const [users, setUsers] = useState<UserType[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0); // 0-based
+  const [rowsPerPage, setRowsPerPage] = useState(100);
   const [loading, setLoading] = useState(false);
+
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 250);
+
   const [feedbackMsg, setFeedbackMsg] = useState<{
     type: "error" | "success" | null;
     message: string;
   }>({ type: null, message: "" });
 
-  // Modal
+  // Modal Crear/Editar (lo que ya funcionaba)
   const [openModal, setOpenModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<UserType>({
@@ -55,27 +72,79 @@ export default function Users() {
     family_name: "",
     external_id: "",
     active: true,
+    lastModified: "",
   });
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
+  // ——— MODO de carga: paginado normal o búsqueda exacta en backend (Enter) ———
+  const exactSearchRef = useRef<string>(""); // cuando esté no usamos paginación del server
 
-  const loadUsers = async () => {
+  useEffect(() => {
+    if (exactSearchRef.current) {
+      // Si hay una búsqueda exacta vigente, no recargamos por paginación;
+      // el resultado exacto se muestra tal cual (sin paginación).
+      return;
+    }
+    void loadPaged();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage]);
+
+  async function loadPaged() {
     setLoading(true);
     try {
-      const data = await fetchUsers();
-      setUsers(data);
+      const startIndex = page * rowsPerPage + 1;
+      const { users, total } = await fetchUsersService({ startIndex, count: rowsPerPage });
+      setUsers(users);
+      setTotal(total);
     } catch (e: any) {
-      setFeedbackMsg({
-        type: "error",
-        message: e?.message || "Error cargando usuarios.",
-      });
+      setFeedbackMsg({ type: "error", message: e?.message || "Error cargando usuarios." });
     } finally {
       setLoading(false);
     }
+  }
+
+  // Búsqueda exacta en backend al presionar Enter (username o correo)
+  async function loadExactFromServer(q: string) {
+    const needle = q.trim();
+    if (!needle) {
+      exactSearchRef.current = "";
+      setPage(0);
+      await loadPaged();
+      return;
+    }
+    setLoading(true);
+    try {
+      exactSearchRef.current = needle;
+      const { users } = await fetchUsersService({ user_name: needle });
+      setUsers(users);
+      setTotal(users.length);
+      setPage(0);
+    } catch (e: any) {
+      setUsers([]);
+      setTotal(0);
+      setFeedbackMsg({ type: "error", message: e?.message || "Error buscando usuario." });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ——— Filtro local “mientras escribes” (sobre lo cargado) ———
+  const filteredUsers = useMemo(() => {
+    const n = (debouncedSearch || "").toLowerCase().trim();
+    if (!n) return users;
+    return users.filter((u) => {
+      const uname = (u.userName || "").toLowerCase();
+      const mail = (u.email || "").toLowerCase();
+      return uname.includes(n) || mail.includes(n);
+    });
+  }, [debouncedSearch, users]);
+
+  const handleChangePage = (_: any, newPage: number) => setPage(newPage);
+  const handleChangeRowsPerPage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(e.target.value, 10));
+    setPage(0);
   };
 
+  // --- Acciones (conservadas) ---
   const handleOpenModal = (user?: UserType) => {
     if (user) {
       setIsEditing(true);
@@ -90,6 +159,7 @@ export default function Users() {
         family_name: "",
         external_id: "",
         active: true,
+        lastModified: "",
       });
     }
     setOpenModal(true);
@@ -97,16 +167,12 @@ export default function Users() {
 
   const handleCloseModal = () => {
     setOpenModal(false);
-    // limpiar feedback del modal para la siguiente vez
-    setTimeout(() => {
-      setFeedbackMsg({ type: null, message: "" });
-    }, 0);
+    setTimeout(() => setFeedbackMsg({ type: null, message: "" }), 0);
   };
 
   const handleSubmit = async () => {
     setFeedbackMsg({ type: null, message: "" });
     setLoading(true);
-
     try {
       if (isEditing) {
         await updateUser(formData);
@@ -116,12 +182,13 @@ export default function Users() {
         setFeedbackMsg({ type: "success", message: "Usuario creado con éxito" });
       }
       handleCloseModal();
-      await loadUsers();
+      if (exactSearchRef.current) {
+        await loadExactFromServer(exactSearchRef.current);
+      } else {
+        await loadPaged();
+      }
     } catch (e: any) {
-      setFeedbackMsg({
-        type: "error",
-        message: e?.message || "Error en la operación.",
-      });
+      setFeedbackMsg({ type: "error", message: e?.message || "Error en la operación." });
     } finally {
       setLoading(false);
     }
@@ -133,24 +200,17 @@ export default function Users() {
     try {
       await deleteUser(user);
       setFeedbackMsg({ type: "success", message: "Usuario eliminado con éxito" });
-      await loadUsers();
+      if (exactSearchRef.current) {
+        await loadExactFromServer(exactSearchRef.current);
+      } else {
+        await loadPaged();
+      }
     } catch (e: any) {
-      setFeedbackMsg({
-        type: "error",
-        message: e?.message || "Error eliminando usuario",
-      });
+      setFeedbackMsg({ type: "error", message: e?.message || "Error eliminando usuario" });
     } finally {
       setLoading(false);
     }
   };
-
-  const filteredUsers = search
-    ? users.filter(
-        (u) =>
-          u.userName.toLowerCase().includes(search.toLowerCase()) ||
-          u.email.toLowerCase().includes(search.toLowerCase())
-      )
-    : users;
 
   const formatDate = (iso?: string) =>
     iso
@@ -162,6 +222,10 @@ export default function Users() {
           minute: "2-digit",
         })
       : "-";
+
+  const totalLabel = exactSearchRef.current
+    ? `Resultados: ${users.length}`
+    : `Total de usuarios: ${total}`;
 
   return (
     <Box
@@ -226,7 +290,7 @@ export default function Users() {
               Users
             </Typography>
             <Typography variant="body1" sx={{ mb: 3, fontWeight: 500 }}>
-              Total de usuarios: {users.length}
+              {totalLabel}
             </Typography>
 
             <Box
@@ -239,12 +303,21 @@ export default function Users() {
               }}
             >
               <TextField
-                label="Buscar por username o correo"
+                label="Buscar por username o correo (en esta página). Enter = búsqueda exacta en servidor"
                 variant="outlined"
                 size="small"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                sx={{ width: "100%", maxWidth: 400 }}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  // al tipear, salimos del modo exacto (si estaba activo)
+                  if (exactSearchRef.current) exactSearchRef.current = "";
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    void loadExactFromServer(search);
+                  }
+                }}
+                sx={{ width: "100%", maxWidth: 520 }}
               />
               <Button
                 variant="contained"
@@ -264,7 +337,7 @@ export default function Users() {
                 <CircularProgress />
               </Box>
             ) : (
-              <TableContainer component={Paper} sx={{ maxHeight: 400, mb: 3, overflowX: "auto" }}>
+              <TableContainer component={Paper} sx={{ maxHeight: 420, mb: 1.5, overflowX: "auto" }}>
                 <Table stickyHeader size="small" sx={{ minWidth: 900 }}>
                   <TableHead>
                     <TableRow>
@@ -309,6 +382,22 @@ export default function Users() {
               </TableContainer>
             )}
 
+            {/* Paginación visible cuando NO hay búsqueda exacta del servidor */}
+            {!exactSearchRef.current && (
+              <TablePagination
+                component="div"
+                count={total}
+                page={page}
+                onPageChange={(_e, p) => setPage(p)}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={(e) => {
+                  setRowsPerPage(parseInt(e.target.value, 10));
+                  setPage(0);
+                }}
+                rowsPerPageOptions={[25, 50, 100]}
+              />
+            )}
+
             {feedbackMsg.type && (
               <Alert
                 severity={feedbackMsg.type}
@@ -348,7 +437,7 @@ export default function Users() {
         </Box>
       </Box>
 
-      {/* Modal Crear/Editar */}
+      {/* Modal Crear/Editar (conservado) */}
       <Dialog open={openModal} onClose={handleCloseModal} fullWidth maxWidth="sm">
         <DialogTitle>{isEditing ? "Editar Usuario" : "Nuevo Usuario"}</DialogTitle>
         <DialogContent>
@@ -371,14 +460,14 @@ export default function Users() {
             margin="dense"
             label="Nombre (opcional)"
             fullWidth
-            value={formData.given_name}
+            value={formData.given_name || ""}
             onChange={(e) => setFormData({ ...formData, given_name: e.target.value })}
           />
           <TextField
             margin="dense"
             label="Apellido (opcional)"
             fullWidth
-            value={formData.family_name}
+            value={formData.family_name || ""}
             onChange={(e) => setFormData({ ...formData, family_name: e.target.value })}
           />
           <TextField
@@ -386,7 +475,7 @@ export default function Users() {
             label="External ID (opcional)"
             placeholder="Solo si deseas enlazar con otro sistema"
             fullWidth
-            value={formData.external_id}
+            value={formData.external_id || ""}
             onChange={(e) => setFormData({ ...formData, external_id: e.target.value })}
           />
           {isEditing && (

@@ -1,4 +1,3 @@
-// services/URL_List.ts
 import api from "./api";
 
 /* ===================== Tipos ===================== */
@@ -61,6 +60,18 @@ export type CreateUrlListResponse = {
   deploy_error?: string;
 };
 
+export type PutUrlListResponse = {
+  put: {
+    put: unknown;
+    accepted: { exact: string[]; wildcard_as_exact: string[]; regex: string[] };
+    rejected: string[];
+    type_used: "exact" | "regex";
+    sent: number;
+  };
+  deploy?: unknown;
+  deploy_error?: string;
+};
+
 /* ===================== Queries ===================== */
 
 export async function fetchUrlLists(): Promise<URLListType[]> {
@@ -73,12 +84,7 @@ export async function fetchUrlCount(): Promise<number> {
   return data.count;
 }
 
-/* ========== Batch (append/replace, deploy en backend) ========== */
-/**
- * idsOrNames: coma-separado. Números => IDs, otros => nombres.
- * urlsInput : texto multilinea, una entrada por línea.
- * allowRegex: si true, también enviará entradas detectadas como regex (solo a listas tipo regex).
- */
+/* ========== Batch (append/replace) ========== */
 export async function batchUpdateUrlLists(
   actionType: "append" | "replace",
   idsOrNames: string,
@@ -109,14 +115,14 @@ export async function batchUpdateUrlLists(
 
   const { data } = await api.patch<BatchResponse>(
     `/Gamma/url-lists/_batch/${actionType}`,
-    urlsArray, // body: array plano de strings
+    urlsArray,
     { params }
   );
 
   return data;
 }
 
-/* ===================== Delete (deploy auto en backend) ===================== */
+/* ===================== Delete ===================== */
 
 export async function deleteUrlListById(listId: number): Promise<void> {
   await api.delete(`/Gamma/url-lists/${listId}`);
@@ -126,11 +132,7 @@ export async function deleteUrlListByName(name: string): Promise<void> {
   await api.delete(`/Gamma/url-lists/by-name`, { params: { name } });
 }
 
-/* ===================== Create (deploy auto en backend) ===================== */
-/**
- * Crea una URL List con nombre y un set inicial de URLs (no puede estar vacía).
- * newAllowRegex: si true, permite que el backend bucketice regex cuando corresponda.
- */
+/* ===================== Create ===================== */
 export async function createUrlList(
   newName: string,
   newUrls: string,
@@ -141,22 +143,28 @@ export async function createUrlList(
     .map((u) => u.trim())
     .filter(Boolean);
 
-  // Validación rápida en cliente (evita llamadas vacías)
-  if (!newName.trim()) {
-    throw new Error("El nombre es obligatorio.");
-  }
-  if (urlsArray.length === 0) {
-    throw new Error("Debes ingresar al menos una URL.");
-  }
+  if (!newName.trim()) throw new Error("El nombre es obligatorio.");
+  if (urlsArray.length === 0) throw new Error("Debes ingresar al menos una URL.");
 
   const { data } = await api.post<CreateUrlListResponse>(
     "/Gamma/url-lists",
-    {
-      name: newName.trim(),
-      urls: urlsArray,
-      allow_regex: newAllowRegex,
-    }
+    { name: newName.trim(), urls: urlsArray, allow_regex: newAllowRegex }
   );
 
+  return data;
+}
+
+/* ===================== PUT (editar nombre + reemplazar URLs) ===================== */
+export async function putUrlListById(
+  id: number,
+  name: string | undefined,
+  combinedUrls: string[],             // URLs finales (existentes - borradas + nuevas)
+  allowRegex: boolean
+): Promise<PutUrlListResponse> {
+  if (!combinedUrls.length) throw new Error("Debes enviar al menos una URL.");
+  const payload: any = { urls: combinedUrls, allow_regex: allowRegex };
+  if (name && name.trim()) payload.name = name.trim();
+
+  const { data } = await api.put<PutUrlListResponse>(`/Gamma/url-lists/${id}`, payload);
   return data;
 }

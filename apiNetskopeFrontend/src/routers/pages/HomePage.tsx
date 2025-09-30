@@ -17,7 +17,7 @@ import {
   InputAdornment,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 
 // Icons
 import { Cloud, Group, Apps, Link as LinkIcon, Lock, Policy  } from '@mui/icons-material';
@@ -53,6 +53,15 @@ export default function Homepage() {
   );
 
   const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // 1) Eliminar el token
+    localStorage.removeItem('access_token');
+    // 2) (Opcional) limpiar cualquier otro dato de sesión si lo hubiera
+    // sessionStorage.clear();
+    // 3) Redirigir al login
+    navigate('/login', { replace: true });
+  };
 
   return (
     <Box
@@ -232,8 +241,7 @@ export default function Homepage() {
             {/* Botón de Cerrar sesión */}
             <Box sx={{ textAlign: 'center', mt: 3 }}>
               <Button
-                component={RouterLink}
-                to="/login"
+                onClick={handleLogout}
                 variant="contained"
                 sx={{
                   py: 1.3,

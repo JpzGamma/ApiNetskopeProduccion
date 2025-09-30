@@ -48,6 +48,7 @@ import {
   batchUpdateUrlLists,
   deleteUrlListById,
   createUrlList,
+  putUrlListById, // ⬅️ nuevo
 } from "../../services/URL_List";
 
 export default function URL_List() {
@@ -76,6 +77,9 @@ export default function URL_List() {
   const [selectedList, setSelectedList] = useState<URLListType | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editableUrls, setEditableUrls] = useState<string[]>([]);
+  const [editName, setEditName] = useState<string>("");        // ⬅️ nuevo (renombrar)
+  const [addUrlsText, setAddUrlsText] = useState<string>("");  // ⬅️ nuevo (añadir)
+  const [allowRegexEdit, setAllowRegexEdit] = useState(false); // ⬅️ nuevo (regex en edición)
 
   // Modal Crear
   const [openCreate, setOpenCreate] = useState(false);
@@ -210,6 +214,9 @@ export default function URL_List() {
     setSelectedList(list);
     setEditMode(isEdit);
     setEditableUrls(list.data.urls);
+    setEditName(list.name);   // pre-carga nombre
+    setAddUrlsText("");       // limpia textarea de altas
+    setAllowRegexEdit(false);
     setOpenDialog(true);
   };
 
@@ -223,13 +230,41 @@ export default function URL_List() {
     setEditableUrls((prev) => prev.filter((u) => u !== url));
   };
 
+  // Guardar edición con PUT: nombre + (urls existentes - borradas + nuevas)
   const handleSaveEdit = async () => {
     if (!selectedList) return;
+
+    const newOnes = addUrlsText
+      .split("\n")
+      .map((u) => u.trim())
+      .filter(Boolean);
+
+    const combined = [...editableUrls, ...newOnes];
+
+    if (combined.length === 0) {
+      setFeedbackMsg({ type: "error", message: "La lista no puede quedar vacía." });
+      return;
+    }
+
     setLoading(true);
     try {
-      // Para edición puntual usamos replace sobre el ID
-      await batchUpdateUrlLists("replace", selectedList.id.toString(), editableUrls.join("\n"), false);
-      setFeedbackMsg({ type: "success", message: "Lista actualizada correctamente." });
+      const resp = await putUrlListById(
+        selectedList.id,
+        editName,
+        combined,
+        allowRegexEdit
+      );
+
+      const rejected = (resp as any)?.put?.rejected ?? [];
+      if (Array.isArray(rejected) && rejected.length > 0) {
+        setFeedbackMsg({
+          type: "info",
+          message: `Algunas entradas fueron rechazadas por validación: ${rejected.join(", ")}`,
+        });
+      } else {
+        setFeedbackMsg({ type: "success", message: "Lista actualizada correctamente." });
+      }
+
       await loadUrlLists();
     } catch (e: any) {
       setFeedbackMsg({ type: "error", message: e?.message ?? "Error al actualizar la lista." });
@@ -366,7 +401,7 @@ export default function URL_List() {
               </Button>
 
               <TextField
-                label="Buscar URL List (nombre exacto)"
+                label="Buscar URL List (nombre)"
                 variant="outlined"
                 size="small"
                 value={searchName}
@@ -622,10 +657,9 @@ export default function URL_List() {
                 onChange={(e) => setUrlsInput(e.target.value)}
                 sx={{ mb: 3 }}
                 placeholder={`example.com
+www.example.com
 *.example.com
-example.com/*
 sub.domain.com
-123.123.123.123
 example.com/path/to/page`}
               />
 
@@ -680,42 +714,89 @@ example.com/path/to/page`}
       {/* Modal ver/editar */}
       <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
         <DialogTitle>
-          {selectedList?.name} {editMode ? "– Editar URLs" : "– Ver URLs"}
+          {editMode ? "Editar URL List" : "Ver URL List"}
         </DialogTitle>
+
         <DialogContent dividers>
           {editMode ? (
-            <List sx={{ maxHeight: 300, overflowY: "auto" }}>
-              {editableUrls.map((url) => (
-                <ListItem
-                  key={url}
-                  secondaryAction={
-                    <IconButton edge="end" onClick={() => handleDeleteUrlFromEdit(url)} color="error">
-                      <DeleteIcon />
-                    </IconButton>
-                  }
-                >
-                  <ListItemText primary={url} />
-                </ListItem>
-              ))}
-              {editableUrls.length === 0 && (
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 2 }}>
-                  No hay URLs en esta lista.
-                </Typography>
-              )}
-            </List>
+            <>
+              <TextField
+                label="Nombre de la lista"
+                fullWidth
+                sx={{ mb: 2 }}
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                URLs existentes (puedes eliminar con el icono)
+              </Typography>
+              <List sx={{ maxHeight: 220, overflowY: "auto", mb: 2 }}>
+                {editableUrls.map((url) => (
+                  <ListItem
+                    key={url}
+                    secondaryAction={
+                      <IconButton
+                        edge="end"
+                        onClick={() => handleDeleteUrlFromEdit(url)}
+                        color="error"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemText primary={url} />
+                  </ListItem>
+                ))}
+                {editableUrls.length === 0 && (
+                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 2 }}>
+                    No hay URLs en esta lista.
+                  </Typography>
+                )}
+              </List>
+
+              <TextField
+                label="Añadir nuevas URLs (una por línea)"
+                fullWidth
+                multiline
+                rows={5}
+                value={addUrlsText}
+                onChange={(e) => setAddUrlsText(e.target.value)}
+                placeholder={`example.com
+*.example.com
+sub.dominio.com`}
+                sx={{ mb: 1.5 }}
+              />
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={allowRegexEdit}
+                    onChange={(e) => setAllowRegexEdit(e.target.checked)}
+                  />
+                }
+                label="Permitir Regex (si usas sintaxis regex)"
+                sx={{ mb: 1 }}
+              />
+            </>
           ) : (
-            <List sx={{ maxHeight: 300, overflowY: "auto" }}>
-              {selectedList?.data.urls.map((url) => (
-                <ListItem key={url}>
-                  <ListItemText primary={url} />
-                </ListItem>
-              ))}
-              {selectedList?.data.urls.length === 0 && (
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 2 }}>
-                  No hay URLs en esta lista.
-                </Typography>
-              )}
-            </List>
+            <>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                {selectedList?.name} — {selectedList?.data.type} — {selectedList?.data.urls.length} URLs
+              </Typography>
+              <List sx={{ maxHeight: 300, overflowY: "auto" }}>
+                {selectedList?.data.urls.map((url) => (
+                  <ListItem key={url}>
+                    <ListItemText primary={url} />
+                  </ListItem>
+                ))}
+                {selectedList?.data.urls.length === 0 && (
+                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 2 }}>
+                    No hay URLs en esta lista.
+                  </Typography>
+                )}
+              </List>
+            </>
           )}
         </DialogContent>
         <DialogActions>
@@ -757,10 +838,10 @@ example.com/path/to/page`}
             multiline
             rows={6}
             placeholder={`example.com
+www.example.com
 *.example.com
-example.com/*
-123.123.123.123
-example.com/path`}
+sub.domain.com
+example.com/path/to/page`}
           />
         </DialogContent>
         <DialogActions>

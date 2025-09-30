@@ -1,5 +1,4 @@
 from typing import List, Optional
-
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -15,17 +14,30 @@ from app.services.netskopeCCIService import (
 router = APIRouter(prefix="/Gamma", tags=["Gamma - CCI"])
 
 
-# --------- Modelos ---------
 class CciNamesIn(BaseModel):
+    """
+    Summary:
+        Entrada para enriquecer nombres de aplicaciones vía JSON.
+
+    Fields:
+        names (List[str]): Lista de nombres de aplicaciones.
+    """
     names: List[str] = Field(..., description="Lista de nombres de aplicaciones")
 
 
 class CciNamesOut(BaseModel):
+    """
+    Summary:
+        Respuesta con conteo y mapa de categorías.
+
+    Fields:
+        count (int): Número de elementos en 'categories'.
+        categories (dict): Mapa {nombre_lower: categoría}.
+    """
     count: int
     categories: dict
 
 
-# --------- Endpoints ---------
 @router.post(
     "/cci/enrich/names",
     response_model=CciNamesOut,
@@ -37,6 +49,19 @@ def cci_enrich_names(
     pause: float = Query(PAUSE_DEFAULT, ge=0.0, description="Pausa entre lotes (seg)"),
     timeout: int = Query(TIMEOUT_DEFAULT, ge=5, le=300, description="Timeout por request (seg)"),
 ):
+    """
+    Summary:
+        Enriquecimiento JSON: retorna categorías para los nombres enviados.
+
+    Params:
+        payload (CciNamesIn): Lista de nombres.
+        batch_size (int): Tamaño del lote.
+        pause (float): Pausa entre lotes en segundos.
+        timeout (int): Timeout por request en segundos.
+
+    Return:
+        CciNamesOut: Conteo y mapa de categorías.
+    """
     try:
         categories = enrich_app_names(
             payload.names,
@@ -64,9 +89,21 @@ async def cci_enrich_excel(
     pause: float = Query(PAUSE_DEFAULT, ge=0.0),
     timeout: int = Query(TIMEOUT_DEFAULT, ge=5, le=300),
 ):
+    """
+    Summary:
+        Enriquecimiento de un .xlsx subido, agregando la columna 'category' según CCI.
+
+    Params:
+        file (UploadFile): Archivo Excel con columna de nombre reconocible.
+        batch_size (int): Tamaño del lote.
+        pause (float): Pausa entre lotes.
+        timeout (int): Timeout por request.
+        
+    Return:
+        StreamingResponse: Flujo de bytes del Excel enriquecido listo para descargar.
+    """
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="Debe subir un archivo .xlsx")
-
     try:
         content = await file.read()
         result_bytes = enrich_excel_file(
@@ -75,7 +112,6 @@ async def cci_enrich_excel(
             pause=pause,
             timeout=timeout,
         )
-        # Nombre de salida
         out_name = "aplicaciones_con_categorias.xlsx"
         return StreamingResponse(
             iter([result_bytes]),
