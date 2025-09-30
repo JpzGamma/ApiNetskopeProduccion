@@ -62,18 +62,39 @@ export default function ResetPasswordPage() {
           }}
         >
           <CardContent sx={{ p: 4 }}>
-            <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-              <Box
-                component="img"
-                src="/LogoNetskopeAzul.jpeg"
-                alt="Logo de seguridad"
-                sx={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: 6,
-                  boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
-                }}
-              />
+            {/* Logo */}
+            <Box sx={{ display: 'flex', justifyContent: 'center',gap:3, mb: 3 }}>
+              <RouterLink to="/home">
+                <Box
+                  component="img"
+                  src="/LogoNetskopeAzul.jpeg"
+                  alt="Logo"
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 5,
+                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                    mb: 2,
+                    mx: "auto",
+                  }}
+                />
+              </RouterLink>
+              {/* Segundo Logo */}
+              <RouterLink to="/home">
+                <Box
+                  component="img"
+                  src="/LogoGamma.jpeg" 
+                  alt="Logo Nuevo"
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 5,
+                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                    mb: 2,
+                    mx: "auto",
+                  }}
+                />
+              </RouterLink>
             </Box>
 
             <Typography
@@ -180,20 +201,15 @@ export default function ResetPasswordPage() {
             </form>
           </CardContent>
         </Card>
+        {/* Footer */}
+        <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
+          <Typography variant="body2">
+            &copy; 2025 Api - Netskope
+          </Typography>
+          Equipo de Desarrollo - Gamma Medellín
+        </Box>
       </Box>
 
-      <Box
-        sx={{
-          mt: 3,
-          color: "text.secondary",
-          maxWidth: 400,
-          textAlign: "center",
-        }}
-      >
-        <Typography variant="caption">
-          © {new Date().getFullYear()} ApiNetskope
-        </Typography>
-      </Box>
     </Box>
   );
 }

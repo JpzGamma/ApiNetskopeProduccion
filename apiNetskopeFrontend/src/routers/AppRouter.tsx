@@ -13,13 +13,15 @@ import CciApps from "./pages/cciApps";
 import URL_List from "./pages/URL_List";      
 import Users from "./pages/Users"
 import Groups from "./pages/Groups";
+import PrivateApps from "./pages/PrivateApps";
+import Policies from "./pages/Policies";
 
 export default function AppRouter() {
   return (
     <BrowserRouter>
       <Shell>
         <Routes>
-          <Route path="/" element={<Navigate to="/welcome" replace />} /> {/* Redirige a la página de bienvenida por defecto */}
+          <Route path="/" element={<Navigate to="/welcome" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/verify" element={<VerifyPage />} />
@@ -30,6 +32,8 @@ export default function AppRouter() {
           <Route path="/URL_List" element={<URL_List />} />
           <Route path="/Users" element={<Users/>} />
           <Route path="/Groups" element={<Groups/>} />
+          <Route path="/PrivateApps" element={<PrivateApps/>} />
+          <Route path="/Policies" element={<Policies/>}/>
           <Route element={<ProtectedRoute />}>
             <Route path="/home" element={<HomePage />} />
           </Route>
