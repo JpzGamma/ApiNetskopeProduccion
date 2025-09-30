@@ -1,32 +1,65 @@
-import { useState, useEffect } from "react";
-import { TextField, Button, Stack, Alert, Box, Card, CardContent, Typography, InputAdornment } from "@mui/material";
-import { reset } from "../../services/auth";
-import { useSearchParams, useNavigate, Link as RouterLink } from "react-router-dom";
-import { Lock } from "@mui/icons-material"; // Importando el icono de Lock
+import { useState } from "react";
+import {
+  TextField,
+  Button,
+  Stack,
+  Alert,
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  InputAdornment,
+} from "@mui/material";
+import { reset } from "../../services/auth"; // Debe aceptar { correo, codigo, new_password }
+import { useNavigate, Link as RouterLink } from "react-router-dom";
+import { Lock, Mail, Password } from "@mui/icons-material";
 
 export default function ResetPasswordPage() {
-  const [sp] = useSearchParams();
-  const [token, setToken] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [codigo, setCodigo] = useState(""); // 6 dígitos
   const [newPassword, setNewPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const nav = useNavigate();
 
-  useEffect(() => {
-    const t = sp.get("token");
-    if (t) setToken(t);
-  }, [sp]);
+  const validarPassword = (p: string) =>
+    p.length >= 8 &&
+    /[A-Z]/.test(p) &&
+    /[a-z]/.test(p) &&
+    /[0-9]/.test(p) &&
+    /[\W_]/.test(p);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
     setErr(null);
+
+    // Validaciones rápidas en cliente
+    if (!correo.trim()) {
+      setErr("Ingresa tu correo.");
+      return;
+    }
+    if (!/^\d{6}$/.test(codigo.trim())) {
+      setErr("El código debe tener 6 dígitos.");
+      return;
+    }
+    if (!validarPassword(newPassword)) {
+      setErr(
+        "La nueva contraseña debe tener mínimo 8 caracteres, con mayúscula, minúscula, número y símbolo."
+      );
+      return;
+    }
+
     try {
-      const res = await reset({ token, new_password: newPassword });
-      setMsg(res.message);
+      const res = await reset({
+        correo: correo.trim(),
+        codigo: codigo.trim(),
+        new_password: newPassword,
+      });
+      setMsg(res.message || "Contraseña actualizada correctamente");
       setTimeout(() => nav("/login"), 800);
     } catch (e: any) {
-      setErr(e?.response?.data?.detail || "Error al restablecer");
+      setErr(e?.response?.data?.detail || "Error al restablecer contraseña");
     }
   };
 
@@ -49,14 +82,15 @@ export default function ResetPasswordPage() {
           borderRadius: "12px",
           padding: "40px",
           boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)",
-          background:"linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+          background:
+            "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
         }}
       >
         <Card
           elevation={6}
           sx={{
             width: "100%",
-            maxWidth: 400,
+            maxWidth: 420,
             borderRadius: 3,
             boxShadow: "0px 10px 30px rgba(0,0,0,0.05)",
           }}
@@ -76,12 +110,7 @@ export default function ResetPasswordPage() {
               />
             </Box>
 
-            <Typography
-              variant="h6"
-              fontWeight={600}
-              align="center"
-              sx={{ mb: 1 }}
-            >
+            <Typography variant="h6" fontWeight={600} align="center" sx={{ mb: 1 }}>
               Restablecer Contraseña
             </Typography>
             <Typography
@@ -90,41 +119,74 @@ export default function ResetPasswordPage() {
               color="text.secondary"
               sx={{ mb: 3 }}
             >
-              Ingresa el token recibido por correo para restablecer tu
-              contraseña.
+              Ingresa tu correo, el <b>código de 6 dígitos</b> recibido y tu
+              nueva contraseña.
             </Typography>
 
             <form onSubmit={onSubmit} autoComplete="off">
-              {/* Hack para evitar autocompletado */}
-              <input type="text" name="fakeuser" autoComplete="username" style={{ display: "none" }} />
-              <input type="password" name="fakepass" autoComplete="new-password" style={{ display: "none" }} />
+              {/* Hacks anti-autocompletado */}
+              <input
+                type="text"
+                name="fakeuser"
+                autoComplete="username"
+                style={{ display: "none" }}
+              />
+              <input
+                type="password"
+                name="fakepass"
+                autoComplete="new-password"
+                style={{ display: "none" }}
+              />
+
               <Stack spacing={2}>
                 {msg && <Alert severity="success">{msg}</Alert>}
                 {err && <Alert severity="error">{err}</Alert>}
 
                 <TextField
-                  label="Token"
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  helperText="Pega aquí el token que recibiste por correo"          
+                  label="Correo"
+                  type="email"
+                  value={correo}
+                  onChange={(e) => setCorreo(e.target.value)}
                   fullWidth
                   autoComplete="off"
-                  type="password"
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <Lock color="action" />
+                        <Mail color="action" />
                       </InputAdornment>
                     ),
                   }}
                 />
+
+                <TextField
+                  label="Código (6 dígitos)"
+                  value={codigo}
+                  onChange={(e) => {
+                    // Solo dígitos, máximo 6
+                    const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+                    setCodigo(v);
+                  }}
+                  helperText="Código enviado a tu correo"
+                  fullWidth
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Password color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
                 <TextField
                   label="Nueva contraseña"
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   fullWidth
-                  autoComplete="off"
+                  autoComplete="new-password"
+                  helperText="Mín. 8 caracteres, con mayúscula, minúscula, número y símbolo"
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -133,6 +195,7 @@ export default function ResetPasswordPage() {
                     ),
                   }}
                 />
+
                 <Button
                   variant="contained"
                   type="submit"
@@ -143,15 +206,12 @@ export default function ResetPasswordPage() {
                     textTransform: "none",
                     backgroundColor: "#42a5f5",
                     borderRadius: 2,
-                    ":hover": {
-                      backgroundColor: "#1e88e5",
-                    },
+                    ":hover": { backgroundColor: "#1e88e5" },
                   }}
                 >
                   Cambiar Contraseña
                 </Button>
 
-                {/* Enlace para volver al login */}
                 <Box sx={{ textAlign: "center", mt: 2 }}>
                   <Button
                     variant="outlined"
@@ -186,7 +246,7 @@ export default function ResetPasswordPage() {
         sx={{
           mt: 3,
           color: "text.secondary",
-          maxWidth: 400,
+          maxWidth: 420,
           textAlign: "center",
         }}
       >
