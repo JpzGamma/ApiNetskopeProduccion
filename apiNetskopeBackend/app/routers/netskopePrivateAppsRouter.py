@@ -15,16 +15,36 @@ from app.services.netskopePrivateAppsService import (
 
 router = APIRouter(prefix="/Gamma", tags=["Gamma-PrivateApps"])
 
-# -------------------- Helpers --------------------
 
 def _split_list(s: Optional[str]) -> List[str]:
+    """
+    Summary:
+        Divide una cadena por ',' o ';' y aplica strip a cada elemento.
+
+    Params:
+        s (Optional[str]): Cadena con separadores.
+
+    Return:
+        List[str]: Lista de tokens limpios (sin vacíos).
+    """
     if not s:
         return []
     return [x.strip() for x in re.split(r"[;,]", s) if x.strip()]
 
+
 def _parse_protocols_csv(protocols_csv: Optional[str]) -> List[Dict[str, str]]:
     """
-    Formato: "tcp:22,udp:5000, tcp:443"
+    Summary:
+        Parsea 'tcp:22,udp:5000' a [{'type':'tcp','port':'22'}, ...].
+
+    Params:
+        protocols_csv (Optional[str]): Lista CSV con 'proto:puerto'.
+
+    Return:
+        List[Dict[str, str]]: Estructuras normalizadas para 'protocols'.
+
+    Raises:
+        HTTPException: Si el formato no es válido o el puerto está fuera de rango.
     """
     if not protocols_csv:
         return []
@@ -46,23 +66,23 @@ def _parse_protocols_csv(protocols_csv: Optional[str]) -> List[Dict[str, str]]:
     return out
 
 
-# -------------------- Publishers --------------------
+@router.get("/publishers",summary="Lista publishers NPA")
+def gamma_list_publishers(fields: Optional[str] = Query("publisher_id,publisher_name")):
+    """
+    Summary:
+        Lista los publishers disponibles de Netskope Private Access.
 
-@router.get(
-    "/publishers",
-    summary="Lista publishers NPA",
-    description="Devuelve la lista de publishers. Usa 'fields' para limitar (ej: publisher_id,publisher_name)."
-)
-def gamma_list_publishers(
-    fields: Optional[str] = Query("publisher_id,publisher_name")
-):
+    Params:
+        fields (Optional[str]): Campos a devolver (ej: publisher_id,publisher_name).
+
+    Return:
+        dict: Respuesta JSON de la API de publishers.
+    """
     try:
         return list_publishers(fields=fields)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# -------------------- Private Apps: list / count / get --------------------
 
 @router.get("/private-apps", summary="Lista Private Apps")
 def gamma_list_private_apps(
@@ -71,38 +91,62 @@ def gamma_list_private_apps(
     offset: Optional[int] = Query(None, ge=0),
     limit: Optional[int] = Query(None, ge=1, le=1000),
 ):
+    """
+    Summary:
+        Lista Private Apps con filtros opcionales.
+
+    Params:
+        fields (Optional[str]): Campos a devolver.
+        query (Optional[str]): Término de búsqueda.
+        offset (Optional[int]): Desplazamiento.
+        limit (Optional[int]): Límite.
+
+    Return:
+        dict | list: Respuesta del backend de Netskope.
+    """
     try:
         return list_private_apps(fields=fields, query=query, offset=offset, limit=limit)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/private-apps/count", summary="Cantidad total de Private Apps")
 def gamma_count_private_apps():
+    """
+    Summary:
+        Devuelve el conteo total de Private Apps.
+
+    Params:
+        None
+
+    Return:
+        dict: {'count': <int>}
+    """
     try:
         return {"count": count_private_apps()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/private-apps/{private_app_id}", summary="Obtiene Private App por ID")
 def gamma_get_private_app(private_app_id: int):
+    """
+    Summary:
+        Retorna el detalle de una Private App por su ID.
+
+    Params:
+        private_app_id (int): Identificador de la app privada.
+
+    Return:
+        dict: Detalle de la app.
+    """
     try:
         return get_private_app(private_app_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -------------------- Private Apps: create (por parámetros) --------------------
-
-@router.post(
-    "/private-apps",
-    summary="Crea Private App (por parámetros)",
-    description=(
-        "Crea una Private App con `app_name`, `host`, `protocol` (tcp|udp), `port` (1-65535). "
-        "Puedes enviar `publisher_ids` (coma/; separados), `publisher_names`, o ambos. "
-        "Si envías solo nombres, se resuelven a IDs automáticamente. "
-        "`app_tag` es opcional."
-    ),
-)
+@router.post("/private-apps",summary="Crea Private App (por parámetros)")
 def gamma_create_private_app_params(
     app_name: str = Query(..., description="Nombre de la Private App"),
     host: str = Query(..., description="Host/FQDN o IP"),
@@ -112,6 +156,25 @@ def gamma_create_private_app_params(
     publisher_names: Optional[str] = Query(None, description="Nombres de publishers separados por coma o ;"),
     app_tag: Optional[str] = Query(None, description="Tag opcional para la app"),
 ):
+    """
+    Summary:
+        Crea una Private App a partir de parámetros simples. Si no hay IDs, resuelve IDs por nombres.
+
+    Params:
+        app_name (str): Nombre de la app.
+        host (str): FQDN/IP.
+        protocol (Literal["tcp","udp","TCP","UDP"]): Protocolo.
+        port (int): Puerto.
+        publisher_ids (Optional[str]): IDs CSV/semicolon.
+        publisher_names (Optional[str]): Nombres CSV/semicolon.
+        app_tag (Optional[str]): Tag para convertir a label.
+
+    Return:
+        dict: Respuesta de creación de la Private App.
+
+    Raises:
+        HTTPException: Para validaciones de entrada y resolución de publishers.
+    """
     try:
         proto = protocol.lower()
         ids = _split_list(publisher_ids)
@@ -146,14 +209,12 @@ def gamma_create_private_app_params(
             publishers.append(entry)
 
         port_s = str(int(port))
-
         payload: Dict[str, Any] = {
             "app_name": app_name,
             "host": host,
             "protocols": [{"port": port_s, "type": proto}],
             "publishers": publishers,
         }
-
         tags = [app_tag.strip()] if app_tag and app_tag.strip() else None
         return create_private_app(payload, tags=tags)
     except HTTPException:
@@ -162,27 +223,41 @@ def gamma_create_private_app_params(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -------------------- Private Apps:delete (por ID) --------------------
-
 @router.delete("/private-apps/{private_app_id}", summary="Elimina Private App por ID")
 def gamma_delete_private_app(private_app_id: int):
+    """
+    Summary:
+        Elimina una Private App por ID.
+
+    Params:
+        private_app_id (int): Identificador.
+
+    Return:
+        dict: Respuesta de eliminación {'status', 'id'} o JSON del backend.
+    """
     try:
         return delete_private_app(private_app_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -------------------- Bulk (CSV/XLSX) --------------------
-
-@router.post(
-    "/private-apps/_bulk",
-    summary="Carga masiva de Private Apps (CSV/XLSX)",
-    description=(
-        "Columnas requeridas: app_name, host, protocol(TCP/UDP), port, publisher_id. "
-        "Opcionales: publisher_name, tags. Se agrupan filas por app_name."
-    ),
+@router.post("/private-apps/_bulk",summary="Carga masiva de Private Apps (CSV/XLSX)"
 )
 async def gamma_bulk_create_private_apps(file: UploadFile = File(...)):
+    """
+    Summary:
+        Carga masiva desde CSV/XLSX, consolidando por app_name y creando cada app.
+
+        "Columnas requeridas: app_name, host, protocol(TCP/UDP), port, publisher_id. "
+
+        "Opcionales: publisher_name, tags. Se agrupan filas por app_name."
+
+    Params:
+        file (UploadFile): Archivo .csv o .xlsx.
+
+    Return:
+        dict: {'summary', 'row_errors', 'results'} con métricas y resultados por app.
+    """
     try:
         content = await file.read()
         result = bulk_create_private_apps(content, file.filename or "")

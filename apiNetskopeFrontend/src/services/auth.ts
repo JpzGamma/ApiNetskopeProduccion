@@ -9,7 +9,7 @@ export type RegisterIn = {
 export type VerifyIn = { correo: string; codigo: string };
 export type LoginIn = { correo: string; password: string };
 export type ForgotIn = { correo: string };
-export type ResetTokenIn = { token: string; new_password: string };
+export type ResetTokenIn = { correo: string; codigo: string ;new_password :string};
 
 export async function register(body: RegisterIn) {
   const { data } = await api.post("/auth/register", body);
