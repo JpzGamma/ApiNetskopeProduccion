@@ -26,11 +26,11 @@ import { Cloud, Group, Apps, Link as LinkIcon, Lock, Policy  } from '@mui/icons-
 const tenants = [
   { name: 'URL - List', route: '/URL_List', icon: <LinkIcon fontSize="large" /> },
   { name: 'CCI - Apps', route: '/cciApps', icon: <Apps fontSize="large" /> },
-  { name: 'Usuarios', route: '/Users', icon: <Group fontSize="large" /> },
-  { name: 'Grupos', route: '/Groups', icon: <Cloud fontSize="large" /> },
   { name: 'NPA - Private Apps', route: '/PrivateApps', icon: <Lock fontSize="large" /> },
   { name: 'Políticas Real - Time', route: '/Policies', icon: <Policy fontSize="large" /> },
-  { name: 'Eventos - SWG', route: 'https://example4.com', icon: <Cloud fontSize="large" /> },
+  { name: 'SWG - Usuarios', route: '/Users', icon: <Group fontSize="large" /> },
+  { name: 'SWG - Grupos', route: '/Groups', icon: <Cloud fontSize="large" /> },
+  
 ];
 
 // Colores suaves con efecto glass

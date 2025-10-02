@@ -1,4 +1,4 @@
-// services/Policies.ts
+// src/services/Policies.ts
 import api from "./api";
 
 /* ===================== Tipos normalizados ===================== */
@@ -17,7 +17,7 @@ export type PolicyRule = {
   users?: string[];
   privateApps?: string[];
   privateAppTags?: string[];
-  raw?: any; // Por si necesitas el payload completo original
+  raw?: any; // payload original por si se requiere
 };
 
 export type PolicyGroup = {
@@ -31,14 +31,16 @@ function normalizePolicy(obj: any): PolicyRule {
   const rd = obj?.rule_data ?? obj?.data ?? {};
   const mca = rd?.match_criteria_action ?? {};
   const access = rd?.access_method;
+
   return {
     id: String(obj?.id ?? obj?.rule_id ?? obj?.uuid ?? ""),
     rule_name: String(obj?.rule_name ?? obj?.name ?? "(sin nombre)"),
     group_id: obj?.group_id ? String(obj.group_id) : undefined,
     group_name: obj?.group_name ?? undefined,
-    enabled: typeof obj?.enabled === "string" || typeof obj?.enabled === "number"
-      ? String(obj.enabled) as "0" | "1"
-      : undefined,
+    enabled:
+      typeof obj?.enabled === "string" || typeof obj?.enabled === "number"
+        ? (String(obj.enabled) as "0" | "1")
+        : undefined,
     action_name: mca?.action_name as PolicyAction | undefined,
     access_method: Array.isArray(access) ? (access as AccessMethod[]) : undefined,
     users: Array.isArray(rd?.users) ? rd.users : [],
@@ -57,6 +59,38 @@ function normalizeGroup(obj: any): PolicyGroup {
   };
 }
 
+/* ===================== Helpers ===================== */
+
+// Serializa como claves repetidas (users=a&users=b). Además permite pasar flags de "clear".
+function toSearchParams(obj: Record<string, any>): URLSearchParams {
+  const sp = new URLSearchParams();
+
+  const appendList = (key: string, val?: any[] | null) => {
+    if (!Array.isArray(val)) return;
+    if (val.length === 0) {
+      // Enviar flag para que el backend vacíe explícitamente esa lista.
+      if (key === "private_apps") sp.append("clear_private_apps", "1");
+      if (key === "private_app_tags") sp.append("clear_private_app_tags", "1");
+      if (key === "users") sp.append("clear_users", "1"); // por consistencia, por si algún día quieres vaciar usuarios
+      return;
+    }
+    val.forEach((v) => {
+      if (v !== undefined && v !== null && String(v).length) sp.append(key, String(v));
+    });
+  };
+
+  Object.entries(obj).forEach(([k, v]) => {
+    if (v === undefined || v === null) return;
+    if (Array.isArray(v)) {
+      appendList(k, v);
+    } else {
+      sp.append(k, String(v));
+    }
+  });
+
+  return sp;
+}
+
 /* ===================== Policies: CRUD ===================== */
 
 export async function fetchPolicies(): Promise<PolicyRule[]> {
@@ -72,26 +106,29 @@ export async function getPolicyById(policyId: string): Promise<PolicyRule> {
 
 export async function createPolicy(params: {
   rule_name?: string;
-  group_name?: string;
+  group_name?: string; // el backend espera group_name
   enabled?: "0" | "1";
   users?: string[];
-  access_method?: AccessMethod;
+  access_method?: AccessMethod; // valor único; el router lo mete en array
   action_name?: PolicyAction;
   privateApps?: string[];
   privateAppTags?: string[];
 }): Promise<PolicyRule> {
-  const qp: any = {};
-  if (params.rule_name) qp.rule_name = params.rule_name;
-  if (params.group_name) qp.group_name = params.group_name;
-  if (params.enabled) qp.enabled = params.enabled;
-  if (params.users && params.users.length) qp.users = params.users;
-  if (params.access_method) qp.access_method = params.access_method;
-  if (params.action_name) qp.action_name = params.action_name;
-  if (params.privateApps && params.privateApps.length) qp.private_apps = params.privateApps;
-  if (params.privateAppTags && params.privateAppTags.length) qp.private_app_tags = params.privateAppTags;
+  const qp = toSearchParams({
+    rule_name: params.rule_name,
+    group_name: params.group_name,
+    enabled: params.enabled,
+    users: params.users, // claves repetidas / clear_users si []
+    access_method: params.access_method,
+    action_name: params.action_name,
+    private_apps: params.privateApps, // claves repetidas / clear_private_apps si []
+    private_app_tags: params.privateAppTags, // claves repetidas / clear_private_app_tags si []
+  });
 
-  // El router del backend usa Query params y body vacío
-  const { data } = await api.post<any>("/Gamma/policies/rules", null, { params: qp });
+  const { data } = await api.post<any>("/Gamma/policies/rules", null, {
+    params: qp,
+    paramsSerializer: (p) => (p instanceof URLSearchParams ? p.toString() : ""),
+  });
   return normalizePolicy(data?.data ?? data);
 }
 
@@ -99,7 +136,7 @@ export async function updatePolicy(
   policyId: string,
   params: {
     rule_name?: string;
-    group_name?: string;
+    group_name?: string; // el backend espera group_name
     enabled?: "0" | "1";
     users?: string[];
     access_method?: AccessMethod;
@@ -108,17 +145,21 @@ export async function updatePolicy(
     privateAppTags?: string[];
   }
 ): Promise<PolicyRule> {
-  const qp: any = {};
-  if (params.rule_name) qp.rule_name = params.rule_name;
-  if (params.group_name) qp.group_name = params.group_name;
-  if (params.enabled) qp.enabled = params.enabled;
-  if (params.users && params.users.length) qp.users = params.users;
-  if (params.access_method) qp.access_method = params.access_method;
-  if (params.action_name) qp.action_name = params.action_name;
-  if (params.privateApps && params.privateApps.length) qp.private_apps = params.privateApps;
-  if (params.privateAppTags && params.privateAppTags.length) qp.private_app_tags = params.privateAppTags;
+  const qp = toSearchParams({
+    rule_name: params.rule_name,
+    group_name: params.group_name,
+    enabled: params.enabled,
+    users: params.users,
+    access_method: params.access_method,
+    action_name: params.action_name,
+    private_apps: params.privateApps,
+    private_app_tags: params.privateAppTags,
+  });
 
-  const { data } = await api.patch<any>(`/Gamma/policies/rules/${policyId}`, null, { params: qp });
+  const { data } = await api.patch<any>(`/Gamma/policies/rules/${policyId}`, null, {
+    params: qp,
+    paramsSerializer: (p) => (p instanceof URLSearchParams ? p.toString() : ""),
+  });
   return normalizePolicy(data?.data ?? data);
 }
 

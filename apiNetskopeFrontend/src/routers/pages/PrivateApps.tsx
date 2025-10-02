@@ -209,7 +209,13 @@ export default function PrivateApps() {
 
   const formatTagsForDisplay = (rawTags: any[] | undefined) => {
     if (!Array.isArray(rawTags) || rawTags.length === 0) return [];
-    return rawTags.map((t) => typeof t === "string" ? t : t.name || t.label || t.value || (t.toString ? t.toString() : null)).filter(Boolean) as string[];
+    return rawTags
+      .map((t) =>
+        typeof t === "string"
+          ? t
+          : t.name || t.label || (t as any).value || (t as any).tag_name || (t.toString ? t.toString() : null)
+      )
+      .filter(Boolean) as string[];
   };
 
   return (
@@ -229,7 +235,7 @@ export default function PrivateApps() {
           backgroundColor: "white",
           borderRadius: 3,
           boxShadow: "0 8px 16px rgba(0,0,0,0.1)",
-          maxWidth: 1200,
+          maxWidth: 1500,
           width: "100%",
           p: 3,
           background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
@@ -296,8 +302,8 @@ export default function PrivateApps() {
                 <CircularProgress />
               </Box>
             ) : (
-              <TableContainer component={Paper} sx={{ maxHeight: 400, mb: 3, overflowX: "auto" }}>
-                <Table stickyHeader size="small" sx={{ minWidth: 800 }}>
+              <TableContainer component={Paper} sx={{ maxHeight: 600, mb: 3, overflowX: "auto" }}>
+                <Table stickyHeader size="small" sx={{ minWidth: 900 }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>ID</TableCell>
@@ -368,14 +374,13 @@ export default function PrivateApps() {
                             <TableCell align="center">
                               <Button
                                 component={RouterLink}
-                                to="/policies"
+                                to={`/policies?new=1&fromApp=${encodeURIComponent(a.app_name || "")}`}
                                 variant="outlined"
                                 size="small"
                               >
                                 Crear Política
                               </Button>
                             </TableCell>
-
                           </TableRow>
                         );
                       })
@@ -408,7 +413,7 @@ export default function PrivateApps() {
         </Card>
       </Box>
 
-      {/* Modal Crear / Editar - reutilizable, SE MANTIENE IGUAL EN DISEÑO */}
+      {/* Modal Crear / Editar */}
       <Dialog open={openModal} onClose={handleCloseModal} fullWidth maxWidth="sm">
         <DialogTitle>{editingApp ? "Editar Private App" : "Nueva Private App"}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
@@ -501,7 +506,7 @@ export default function PrivateApps() {
             + Agregar Protocolo
           </Button>
 
-          {/* Publishers múltiples con chips */}
+          {/* Publishers */}
           <Autocomplete
             multiple
             options={publishers}
@@ -520,7 +525,7 @@ export default function PrivateApps() {
             renderInput={(params) => <TextField {...params} label="Publishers" />}
           />
 
-          {/* Tags con chips */}
+          {/* Tags */}
           <Autocomplete
             multiple
             freeSolo
@@ -540,7 +545,7 @@ export default function PrivateApps() {
               value.map((option: string, index: number) => (
                 <Chip
                   variant="outlined"
-                  label={String(option)} // 🔑 siempre string
+                  label={String(option)}
                   {...getTagProps({ index })}
                 />
               ))
@@ -548,8 +553,7 @@ export default function PrivateApps() {
             renderInput={(params) => <TextField {...params} label="Tags" />}
           />
 
-
-          {/* Switch Usar Publisher DNS */}
+          {/* Switch */}
           <FormControl>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Switch
@@ -615,8 +619,6 @@ export default function PrivateApps() {
           <Button onClick={handleCloseViewModal}>Cerrar</Button>
         </DialogActions>
       </Dialog>
-      
-         
     </Box>
   );
 }

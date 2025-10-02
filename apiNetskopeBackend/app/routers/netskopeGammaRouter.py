@@ -12,23 +12,7 @@ from app.services.netskopeGammaService import (
 router = APIRouter(prefix="/Gamma", tags=["Gamma-URL_List"])
 
 
-@router.get("/home", summary="Pantalla inicial de Gamma (sin auth)")
-def gamma_home():
-    """
-    Summary:
-        Devuelve un descriptor mínimo del módulo Gamma para que el front construya la pantalla de inicio.
 
-    Params:
-        None
-
-    Return:
-        dict: Información básica del tenant y los módulos visibles.
-    """
-    return {
-        "tenant": "Gamma",
-        "modules": [{"key": "url-list", "name": "URL Lists", "path": "/Gamma/url-lists"}],
-        "notes": "Desde aquí el front pinta tarjetas para cada módulo.",
-    }
 
 
 class UrlListDataIn(BaseModel):
