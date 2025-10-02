@@ -1,4 +1,4 @@
-// pages/Policies.tsx
+// src/pages/Policies.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
   Box,
@@ -28,12 +28,16 @@ import {
   FormControl,
   InputLabel,
   Tooltip,
+  List,
+  ListItem,
+  ListItemText,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import {
   fetchPolicies,
   fetchPolicyGroups,
@@ -45,7 +49,7 @@ import {
   type PolicyAction,
   type AccessMethod,
 } from "../../services/Policies";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useLocation } from "react-router-dom";
 
 /* ------------ Helpers ------------ */
 const accessMethods: AccessMethod[] = ["Client", "Browser"];
@@ -60,8 +64,7 @@ export default function PoliciesPage() {
 
   // filtros/búsqueda
   const [searchPolicy, setSearchPolicy] = useState("");
-  const [searchGroup, setSearchGroup] = useState("");
-  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  const [searchTag, setSearchTag] = useState("");
 
   // feedback
   const [msg, setMsg] = useState<{ type: "success" | "error" | null; text: string }>({
@@ -92,6 +95,12 @@ export default function PoliciesPage() {
     privateAppTags: "",
   });
 
+  // modales de detalle
+  const [openUsers, setOpenUsers] = useState<string[] | null>(null);
+  const [openApps, setOpenApps] = useState<string[] | null>(null);
+
+  const location = useLocation();
+
   /* ------------ Load ------------ */
   async function loadAll() {
     setLoading(true);
@@ -110,21 +119,31 @@ export default function PoliciesPage() {
     loadAll();
   }, []);
 
+  // Abrir modal precargado si venimos desde Private Apps
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const wantNew = sp.get("new");
+    const fromApp = sp.get("fromApp");
+    if (wantNew === "1") {
+      setEditing(null);
+      setForm((f) => ({ ...f, privateApps: fromApp ? decodeURIComponent(fromApp) : "" }));
+      setOpenEdit(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* ------------ Derived lists ------------ */
-  const groupsFiltered = useMemo(() => {
-    const needle = searchGroup.trim().toLowerCase();
-    return !needle ? groups : groups.filter((g) => g.name.toLowerCase().includes(needle));
-  }, [groups, searchGroup]);
-
   const policiesFiltered = useMemo(() => {
-    const needle = searchPolicy.trim().toLowerCase();
-    const arr = !needle
-      ? policies
-      : policies.filter((p) => p.rule_name.toLowerCase().includes(needle));
+    const needleName = searchPolicy.trim().toLowerCase();
+    const needleTag = searchTag.trim().toLowerCase();
 
-    if (!selectedGroupId) return arr;
-    return arr.filter((p) => p.group_id === selectedGroupId);
-  }, [policies, searchPolicy, selectedGroupId]);
+    return policies.filter((p) => {
+      const nameOk = !needleName || p.rule_name.toLowerCase().includes(needleName);
+      const tagList = (p.privateAppTags || []).map((t) => String(t).toLowerCase());
+      const tagOk = !needleTag || tagList.some((t) => t.includes(needleTag));
+      return nameOk && tagOk;
+    });
+  }, [policies, searchPolicy, searchTag]);
 
   /* ------------ UI helpers ------------ */
   const resetForm = () =>
@@ -165,10 +184,12 @@ export default function PoliciesPage() {
   /* ------------ Actions ------------ */
   const handleSave = async () => {
     setMsg({ type: null, text: "" });
+    const gName = form.group_id ? groups.find((g) => g.id === form.group_id)?.name : undefined;
 
+    // OJO: cuando arrays queden vacíos, el service ya manda los flags clear_*
     const payload = {
       rule_name: form.rule_name.trim() || undefined,
-      group_id: form.group_id || undefined,
+      group_name: gName,
       enabled: form.enabled,
       access_method: form.access_method,
       action_name: form.action_name,
@@ -232,24 +253,18 @@ export default function PoliciesPage() {
       >
         <Card elevation={0} sx={{ background: "transparent" }}>
           <CardContent>
-            {/* Header */}
-            <RouterLink to="/home">
-              <Box
-                component="img"
-                src="/LogoNetskopeAzul.jpeg"
-                alt="Logo"
-                sx={{
-                  width: 70,
-                  height: 70,
-                  borderRadius: 6,
-                  boxShadow: "0 6px 12px rgba(0,0,0,0.4)",
-                  mb: 2,
-                }}
-              />
-            </RouterLink>
+            {/* Logos */}
+            <Box sx={{ display: "flex", justifyContent: "center", gap: 3, mb: 3 }}>
+              <RouterLink to="/home">
+                <Box component="img" src="/LogoNetskopeAzul.jpeg" alt="Logo" sx={{ width: 80, height: 80, borderRadius: 5, boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)", mb: 2 }} />
+              </RouterLink>
+              <RouterLink to="/home">
+                <Box component="img" src="/LogoGamma.jpeg" alt="Logo Nuevo" sx={{ width: 80, height: 80, borderRadius: 5, boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)", mb: 2 }} />
+              </RouterLink>
+            </Box>
 
             <Typography variant="h4" fontWeight={700} align="center" sx={{ mb: 2 }}>
-              Policies & Groups
+              Policies
             </Typography>
 
             {/* Controles */}
@@ -277,9 +292,9 @@ export default function PoliciesPage() {
 
               <TextField
                 size="small"
-                placeholder="Buscar grupo por nombre"
-                value={searchGroup}
-                onChange={(e) => setSearchGroup(e.target.value)}
+                placeholder="Buscar tag por nombre"
+                value={searchTag}
+                onChange={(e) => setSearchTag(e.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -289,26 +304,6 @@ export default function PoliciesPage() {
                 }}
                 sx={{ width: 320, background: "white", borderRadius: 1 }}
               />
-
-              <FormControl size="small" sx={{ minWidth: 260 }}>
-                <InputLabel id="group-filter-label">Filtrar por grupo</InputLabel>
-                <Select
-                  labelId="group-filter-label"
-                  value={selectedGroupId}
-                  label="Filtrar por grupo"
-                  onChange={(e) => setSelectedGroupId(e.target.value as string)}
-                  sx={{ background: "white" }}
-                >
-                  <MenuItem value="">
-                    <em>Todos</em>
-                  </MenuItem>
-                  {groupsFiltered.map((g) => (
-                    <MenuItem key={g.id} value={g.id}>
-                      {g.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
 
               <Stack direction="row" spacing={1}>
                 <Tooltip title="Refrescar">
@@ -341,7 +336,6 @@ export default function PoliciesPage() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Nombre</TableCell>
-                    <TableCell>Grupo</TableCell>
                     <TableCell>Estado</TableCell>
                     <TableCell>Acción</TableCell>
                     <TableCell>Acceso</TableCell>
@@ -354,7 +348,7 @@ export default function PoliciesPage() {
                 <TableBody>
                   {policiesFiltered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center">
+                      <TableCell colSpan={8} align="center">
                         Sin resultados
                       </TableCell>
                     </TableRow>
@@ -363,9 +357,6 @@ export default function PoliciesPage() {
                       <TableRow key={p.id}>
                         <TableCell>{p.rule_name}</TableCell>
                         <TableCell>
-                          {groups.find((g) => g.id === p.group_id)?.name || "-"}
-                        </TableCell>
-                        <TableCell>
                           <Chip
                             size="small"
                             label={p.enabled === "1" ? "Activa" : "Inactiva"}
@@ -373,18 +364,38 @@ export default function PoliciesPage() {
                           />
                         </TableCell>
                         <TableCell>{p.action_name || "-"}</TableCell>
-                        <TableCell>
-                          {(p.access_method || []).join(", ") || "-"}
+                        <TableCell>{(p.access_method || []).join(", ") || "-"}</TableCell>
+
+                        {/* Usuarios: SOLO icono */}
+                        <TableCell align="center">
+                          {p.users && p.users.length > 0 ? (
+                            <Tooltip title="Ver usuarios">
+                              <IconButton size="small" onClick={() => setOpenUsers(p.users!)}>
+                                <VisibilityIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            "-"
+                          )}
                         </TableCell>
-                        <TableCell sx={{ maxWidth: 220 }}>
-                          {(p.users || []).join(", ") || "-"}
+
+                        {/* Apps: SOLO icono */}
+                        <TableCell align="center">
+                          {p.privateApps && p.privateApps.length > 0 ? (
+                            <Tooltip title="Ver apps">
+                              <IconButton size="small" onClick={() => setOpenApps(p.privateApps!)}>
+                                <VisibilityIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            "-"
+                          )}
                         </TableCell>
-                        <TableCell sx={{ maxWidth: 220 }}>
-                          {(p.privateApps || []).join(", ") || "-"}
-                        </TableCell>
+
                         <TableCell sx={{ maxWidth: 220 }}>
                           {(p.privateAppTags || []).join(", ") || "-"}
                         </TableCell>
+
                         <TableCell align="center">
                           <Tooltip title="Editar">
                             <IconButton onClick={() => openUpdate(p)} sx={{ color: "#FFA726" }}>
@@ -450,9 +461,7 @@ export default function PoliciesPage() {
               <Select
                 labelId="enabled-label"
                 value={form.enabled}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, enabled: e.target.value as "0" | "1" }))
-                }
+                onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.value as "0" | "1" }))}
               >
                 <MenuItem value="1">Activa</MenuItem>
                 <MenuItem value="0">Inactiva</MenuItem>
@@ -520,9 +529,7 @@ export default function PoliciesPage() {
             <TextField
               label="Private App Tags (coma-separadas)"
               value={form.privateAppTags}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, privateAppTags: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, privateAppTags: e.target.value }))}
               fullWidth
             />
           </Stack>
@@ -532,6 +539,48 @@ export default function PoliciesPage() {
           <Button variant="contained" onClick={handleSave}>
             {editing ? "Actualizar" : "Crear"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal Usuarios */}
+      <Dialog open={!!openUsers} onClose={() => setOpenUsers(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Usuarios de la política</DialogTitle>
+        <DialogContent dividers>
+          {openUsers && openUsers.length > 0 ? (
+            <List dense>
+              {openUsers.map((u, i) => (
+                <ListItem key={i}>
+                  <ListItemText primary={u} />
+                </ListItem>
+              ))}
+            </List>
+          ) : (
+            <Typography variant="body2">Sin usuarios.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenUsers(null)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal Apps */}
+      <Dialog open={!!openApps} onClose={() => setOpenApps(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Apps asociadas</DialogTitle>
+        <DialogContent dividers>
+          {openApps && openApps.length > 0 ? (
+            <List dense>
+              {openApps.map((a, i) => (
+                <ListItem key={i}>
+                  <ListItemText primary={a} />
+                </ListItem>
+              ))}
+            </List>
+          ) : (
+            <Typography variant="body2">Sin apps.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenApps(null)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
     </Box>
