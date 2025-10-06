@@ -14,6 +14,12 @@ from app.routers import netskopePoliciesRouter
 from app.models import user
 from app.config import settings
 from app.routers.auth import get_current_user
+from app.dependencies import Base, engine
+
+print("🔧 Verificando tablas...")
+Base.metadata.create_all(bind=engine)
+print("✅ Tablas verificadas / creadas correctamente.")
+
 
 app = FastAPI(
     title="ApiNetskope",
@@ -43,10 +49,7 @@ app.add_middleware(
 def root():
     """
     Summary:
-
-        Endpoint de estado de los  servicio.
-
-
+        Endpoint de estado del servicio.
     Params:
         None
     Return:
