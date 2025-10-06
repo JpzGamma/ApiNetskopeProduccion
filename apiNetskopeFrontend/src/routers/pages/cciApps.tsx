@@ -118,7 +118,7 @@ export default function CciApps() {
             </Typography>
 
             <Typography variant="body2" sx={{ mb: 3 }}>
-              Sube tu archivo Excel (.xlsx) para procesarlo
+              Sube tu archivo Excel (.xlsx) con las columnas id, current_name , application_name para procesarlo y categorizar cada Aplicación del cci
             </Typography>
 
             {/* Seleccionar archivo */}
