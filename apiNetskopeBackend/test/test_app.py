@@ -10,5 +10,8 @@ def test_root_status_code():
 def test_root_content():
     resp = client.get("/")
     data = resp.json()
-    
-    assert data.get("message") == "CAMBIO ONLY"
+    assert "docs" in data
+    assert "env" in data
+    assert "service" in data
+    assert "status" in data
+    assert data["service"] == "ApiNetskope - Auth"

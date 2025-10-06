@@ -5,3 +5,6 @@ __pycache__/
 .env.prod
 .vscode/*
 !/.vscode/launch.json
+.coverage
+test.db
+*.log
