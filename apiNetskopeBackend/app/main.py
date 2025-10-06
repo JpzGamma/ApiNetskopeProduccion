@@ -43,7 +43,7 @@ app.add_middleware(
 def root():
     """
     Summary:
-        Endpoint de estado del servicio.
+        Endpoint de estado de los  servicio.
     Params:
         None
     Return:
