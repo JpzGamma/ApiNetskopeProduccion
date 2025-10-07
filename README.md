@@ -27,6 +27,8 @@ ApiNetskope/
 
 git clone https://github.com/JpzGamma/ApiNetskope.git
 
+# crear los archivos env.dev en el backend y el frontend como la muestra
+
 # Instalación de Docker & Docker Compose
 
 // Actualiza los paquetes
