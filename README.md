@@ -34,11 +34,13 @@ git clone https://github.com/JpzGamma/ApiNetskope.git
 // Actualiza los paquetes
 
 sudo apt update
+
 sudo apt install -y ca-certificates curl gnupg lsb-release
 
 // Agregar la clave GPG de Docker
 
 sudo mkdir -p /etc/apt/keyrings
+
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
 // Agregar el repositorio oficial de Docker
@@ -50,18 +52,23 @@ echo \
 // Instalar Docker Engine y Docker Compose Plugin
 
 sudo apt update
+
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 // Verificación que Docker esté instalado
+
 docker --version
+
 docker compose version
 
 # Docker & Docker compose para la creacion de contenedores y levantamiento 
 
 docker compose -f docker-compose.dev.yml build --no-cache 
+
 docker compose -f docker-compose.dev.yml up -d
 
 // Apagar el contenedor
+
 docker compose -f docker-compose.dev.yml down
 
 # NOTA
