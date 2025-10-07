@@ -1,14 +1,10 @@
 FROM node:22-alpine
 WORKDIR /app
 
-# instalar dependencias
 COPY package*.json ./
 RUN npm install
 
-# copiar el código
 COPY . .
 
-# puerto del dev server
 EXPOSE 3005
-
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3005"]
