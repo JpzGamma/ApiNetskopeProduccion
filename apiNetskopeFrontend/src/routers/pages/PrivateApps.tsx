@@ -406,8 +406,9 @@ export default function PrivateApps() {
               </Button>
             </Box>
             <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
-              <Typography variant="body2">&copy; 2025 Api - Netskope</Typography>
-              Equipo de Desarrollo - Gamma Medellín
+              <Typography variant="body2">&copy; 2026 Api - Netskope</Typography>
+              
+             Equipo de Desarrollo Gamma Ingenieros
             </Box>
           </CardContent>
         </Card>

@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   db:
     image: postgres:16
@@ -14,17 +16,18 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    restart: unless-stopped
 
   backend:
     build:
       context: ./apiNetskopeBackend
       dockerfile: Dockerfile.dev
     env_file:
-      - ./apiNetskopeBackend/.env.dev      # <-- usas tu .env.dev
+      - ./apiNetskopeBackend/.env.dev
     volumes:
-      - ./apiNetskopeBackend/app:/app/app  # hot-reload del código
+      - ./apiNetskopeBackend/app:/app/app
     ports:
-      - "8001:8001"
+      - "8001:8001"             # FastAPI publicado HTTP
     depends_on:
       db:
         condition: service_healthy
@@ -44,15 +47,27 @@ services:
       CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ./apiNetskopeFrontend/src:/app/src
-      # Vite no carga .env.dev por defecto en 'dev', así que lo montamos como /app/.env:
+      - ./apiNetskopeFrontend/public:/app/public
       - ./apiNetskopeFrontend/.env.dev:/app/.env:ro
     ports:
-      - "3005:3005"
+      - "3005:3005"             # Vite publicado HTTP
     depends_on:
       - backend
     restart: unless-stopped
     command: >
       npm run dev -- --host 0.0.0.0 --port 3005
+
+  addresses:
+    build:
+      context: ./addresses
+      dockerfile: Dockerfile.dev
+    environment:
+      FLASK_SECRET_KEY: "${FLASK_SECRET_KEY:-super-secret}"
+      FLASK_HOST: "0.0.0.0"
+      FLASK_PORT: "8080"
+    ports:
+      - "8081:8080"             # Addresses publicado HTTP aquí
+    restart: unless-stopped
 
 volumes:
   pgdata:

@@ -15,6 +15,7 @@ import Users from "./pages/Users"
 import Groups from "./pages/Groups";
 import PrivateApps from "./pages/PrivateApps";
 import Policies from "./pages/Policies";
+import Score from "./pages/UserScore";
 
 export default function AppRouter() {
   return (
@@ -34,8 +35,9 @@ export default function AppRouter() {
           <Route path="/Groups" element={<Groups/>} />
           <Route path="/PrivateApps" element={<PrivateApps/>} />
           <Route path="/Policies" element={<Policies/>}/>
+          <Route path="/Score" element={<Score/>}/>
           <Route element={<ProtectedRoute />}>
-            <Route path="/home" element={<HomePage />} />
+          <Route path="/home" element={<HomePage />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

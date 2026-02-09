@@ -1,0 +1,20 @@
+# addresses/Dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Copiamos solo lo necesario
+COPY front_app.py ListIp.py ./
+
+# Dependencias (las mismas que has usado en la VM de pruebas)
+RUN pip install --no-cache-dir flask dnspython requests gunicorn
+
+# Variables por defecto (puedes sobreescribirlas en compose)
+ENV FLASK_SECRET_KEY=change-me
+ENV FLASK_HOST=0.0.0.0
+ENV FLASK_PORT=8080
+
+EXPOSE 8080
+
+# Gunicorn (más estable que el server de desarrollo de Flask)
+CMD ["gunicorn","-w","2","-k","gthread","-b","0.0.0.0:8080","front_app:app"]

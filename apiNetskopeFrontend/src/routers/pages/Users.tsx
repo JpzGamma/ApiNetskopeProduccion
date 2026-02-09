@@ -431,9 +431,9 @@ export default function Users() {
         {/* Footer */}
         <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
           <Typography variant="body2">
-            &copy; 2025 Api - Netskope
+            &copy; 2026 Api - Netskope
           </Typography>
-          Equipo de Desarrollo - Gamma Medellín
+          Equipo de Desarrollo Gamma Ingenieros
         </Box>
       </Box>
 

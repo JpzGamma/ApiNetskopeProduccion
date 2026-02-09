@@ -421,8 +421,18 @@ export default function PoliciesPage() {
                 Volver
               </Button>
             </Box>
+            {/* Footer */}
+                <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
+                  <Typography variant="body2">
+                    &copy; 2026 Api - Netskope
+                  </Typography>
+                  
+                  Equipo de Desarrollo Gamma Ingenieros
+                </Box>
           </CardContent>
+          
         </Card>
+        
       </Box>
 
       {/* Modal Crear/Editar */}
@@ -579,10 +589,13 @@ export default function PoliciesPage() {
             <Typography variant="body2">Sin apps.</Typography>
           )}
         </DialogContent>
+        
         <DialogActions>
           <Button onClick={() => setOpenApps(null)}>Cerrar</Button>
         </DialogActions>
+        
       </Dialog>
+      
     </Box>
   );
 }

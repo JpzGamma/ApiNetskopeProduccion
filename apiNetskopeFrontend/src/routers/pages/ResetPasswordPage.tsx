@@ -266,7 +266,7 @@ export default function ResetPasswordPage() {
           <Typography variant="body2">
            © {new Date().getFullYear()} ApiNetskope
           </Typography>
-          Equipo de Desarrollo - Gamma Medellín
+          Equipo de Desarrollo Gamma Ingenieros
         </Box>
       </Box>
 

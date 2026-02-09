@@ -20,7 +20,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 
 // Icons
-import { Cloud, Group, Apps, Link as LinkIcon, Lock, Policy  } from '@mui/icons-material';
+import { Cloud, Group, Apps, Link as LinkIcon, Lock, Policy, QueryStats  } from '@mui/icons-material';
 
 // Datos de tenants con íconos
 const tenants = [
@@ -28,8 +28,9 @@ const tenants = [
   { name: 'CCI - Apps', route: '/cciApps', icon: <Apps fontSize="large" /> },
   { name: 'NPA - Private Apps', route: '/PrivateApps', icon: <Lock fontSize="large" /> },
   { name: 'Políticas Real - Time', route: '/Policies', icon: <Policy fontSize="large" /> },
-  { name: 'SWG - Usuarios', route: '/Users', icon: <Group fontSize="large" /> },
-  { name: 'SWG - Grupos', route: '/Groups', icon: <Cloud fontSize="large" /> },
+  { name: 'SCIM - Usuarios', route: '/Users', icon: <Group fontSize="large" /> },
+  { name: 'SCIM - Grupos', route: '/Groups', icon: <Cloud fontSize="large" /> },
+  { name: 'User - Score', route: '/Score', icon: <QueryStats fontSize="large" /> },
   
 ];
 
@@ -263,9 +264,9 @@ export default function Homepage() {
           {/* Footer */}
         <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
           <Typography variant="body2">
-            &copy; 2025 Api - Netskope
+            &copy; 2026 Api - Netskope
           </Typography>
-          Equipo de Desarrollo - Gamma Medellín
+          Equipo de Desarrollo Gamma Ingenieros
         </Box>
         </Card>
        </Box>
