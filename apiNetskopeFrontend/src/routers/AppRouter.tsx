@@ -10,8 +10,8 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import HomePage from "./pages/HomePage";
 import WelcomePage from "./pages/WelcomePage";
 import CciApps from "./pages/cciApps";
-import URL_List from "./pages/URL_List";      
-import Users from "./pages/Users"
+import URL_List from "./pages/URL_List";
+import Users from "./pages/Users";
 import Groups from "./pages/Groups";
 import PrivateApps from "./pages/PrivateApps";
 import Policies from "./pages/Policies";
@@ -20,28 +20,33 @@ import Score from "./pages/UserScore";
 export default function AppRouter() {
   return (
     <BrowserRouter>
-      <Shell>
-        <Routes>
-          <Route path="/" element={<Navigate to="/welcome" replace />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/verify" element={<VerifyPage />} />
-          <Route path="/forgot" element={<ForgotPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/welcome" element={<WelcomePage />} /> {}
-          <Route path="/cciApps" element={<CciApps />} />
-          <Route path="/URL_List" element={<URL_List />} />
-          <Route path="/Users" element={<Users/>} />
-          <Route path="/Groups" element={<Groups/>} />
-          <Route path="/PrivateApps" element={<PrivateApps/>} />
-          <Route path="/Policies" element={<Policies/>}/>
-          <Route path="/Score" element={<Score/>}/>
-          <Route element={<ProtectedRoute />}>
-          <Route path="/home" element={<HomePage />} />
+      <Routes>
+        <Route path="/" element={<Navigate to="/welcome" replace />} />
+
+        {/* Públicas */}
+        <Route path="/welcome" element={<WelcomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify" element={<VerifyPage />} />
+        <Route path="/forgot" element={<ForgotPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+        {/* Privadas: ProtectedRoute -> Shell -> Outlet */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Shell />}>
+            <Route path="/home" element={<HomePage />} />
+            <Route path="/cciApps" element={<CciApps />} />
+            <Route path="/URL_List" element={<URL_List />} />
+            <Route path="/Users" element={<Users />} />
+            <Route path="/Groups" element={<Groups />} />
+            <Route path="/PrivateApps" element={<PrivateApps />} />
+            <Route path="/Policies" element={<Policies />} />
+            <Route path="/Score" element={<Score />} />
           </Route>
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </Shell>
+        </Route>
+
+        <Route path="*" element={<Navigate to="/welcome" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }
