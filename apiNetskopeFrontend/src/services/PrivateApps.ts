@@ -144,9 +144,10 @@ export async function createPolicyRuleForApp(rule_name: string, action_name: str
       match_criteria_action: { action_name: action_name || "allow" },
       privateApps: extra?.private_apps || extra?.privateApps || [],
       destination_type: extra?.destination_type || "",
-    },
+    },  
   };
 
+  return payload;
 
 }
 
