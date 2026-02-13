@@ -32,12 +32,16 @@ import {
   Stack,
   Divider,
   Tooltip,
+  Chip,
+  InputAdornment,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { Link as RouterLink } from "react-router-dom";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
+import SearchIcon from "@mui/icons-material/Search";
 
 import {
   type URLListType,
@@ -48,7 +52,7 @@ import {
   batchUpdateUrlLists,
   deleteUrlListById,
   createUrlList,
-  putUrlListById, // ⬅️ nuevo
+  putUrlListById,
 } from "../../services/URL_List";
 
 export default function URL_List() {
@@ -77,9 +81,9 @@ export default function URL_List() {
   const [selectedList, setSelectedList] = useState<URLListType | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editableUrls, setEditableUrls] = useState<string[]>([]);
-  const [editName, setEditName] = useState<string>("");        // ⬅️ nuevo (renombrar)
-  const [addUrlsText, setAddUrlsText] = useState<string>("");  // ⬅️ nuevo (añadir)
-  const [allowRegexEdit, setAllowRegexEdit] = useState(false); // ⬅️ nuevo (regex en edición)
+  const [editName, setEditName] = useState<string>("");
+  const [addUrlsText, setAddUrlsText] = useState<string>("");
+  const [allowRegexEdit, setAllowRegexEdit] = useState(false);
 
   // Modal Crear
   const [openCreate, setOpenCreate] = useState(false);
@@ -166,6 +170,7 @@ export default function URL_List() {
   /* ---------- Delete (por ID) ---------- */
 
   const handleDeleteList = async (list: URLListType) => {
+    // eslint-disable-next-line no-restricted-globals
     if (!confirm(`¿Eliminar la URL List "${list.name}" (ID ${list.id})?`)) return;
     setLoading(true);
     try {
@@ -214,8 +219,8 @@ export default function URL_List() {
     setSelectedList(list);
     setEditMode(isEdit);
     setEditableUrls(list.data.urls);
-    setEditName(list.name);   // pre-carga nombre
-    setAddUrlsText("");       // limpia textarea de altas
+    setEditName(list.name);
+    setAddUrlsText("");
     setAllowRegexEdit(false);
     setOpenDialog(true);
   };
@@ -248,12 +253,7 @@ export default function URL_List() {
 
     setLoading(true);
     try {
-      const resp = await putUrlListById(
-        selectedList.id,
-        editName,
-        combined,
-        allowRegexEdit
-      );
+      const resp = await putUrlListById(selectedList.id, editName, combined, allowRegexEdit);
 
       const rejected = (resp as any)?.put?.rejected ?? [];
       if (Array.isArray(rejected) && rejected.length > 0) {
@@ -319,162 +319,330 @@ export default function URL_List() {
     }
   };
 
+  // --- estilos reutilizables (solo UI) ---
+  const glassShellSx = {
+    borderRadius: "20px",
+    background: "rgba(255, 255, 255, 0.8)",
+    backdropFilter: "blur(20px)",
+    border: "2px solid rgba(255, 255, 255, 0.8)",
+    boxShadow: "0 12px 32px rgba(0, 0, 0, 0.10)",
+  } as const;
+
+  const primaryGradient = "linear-gradient(135deg, #42a5f5, #1976d2)";
+
   return (
     <Box
       sx={{
         minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        p: 2,
         background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {/* blobs decorativos (igual que Home) */}
       <Box
         sx={{
-          backgroundColor: "white",
-          borderRadius: "12px",
-          boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)",
-          maxWidth: 1200,
-          width: "100%",
-          p: 3,
-          background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+          position: "absolute",
+          top: "-10%",
+          right: "-5%",
+          width: 500,
+          height: 500,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(66, 165, 245, 0.2) 0%, transparent 70%)",
+          filter: "blur(60px)",
+        }}
+      />
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: "-10%",
+          left: "-5%",
+          width: 400,
+          height: 400,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(163, 201, 241, 0.3) 0%, transparent 70%)",
+          filter: "blur(50px)",
+        }}
+      />
+
+      {/* Contenedor principal */}
+      <Box
+        sx={{
+          position: "relative",
+          zIndex: 1,
+          maxWidth: 1400,
+          mx: "auto",
+          px: { xs: 2, md: 6 },
+          pt: { xs: 2, md: 4 },
+          pb: 6,
         }}
       >
-        <Card elevation={0} sx={{ background: "transparent", boxShadow: "none" }}>
-          <CardContent sx={{ textAlign: "center" }}>
-            {/* Logo */}
-            <Box sx={{ display: 'flex', justifyContent: 'center',gap:3, mb: 3 }}>
-              <RouterLink to="/home">
-                <Box
-                  component="img"
-                  src="/LogoNetskopeAzul.jpeg"
-                  alt="Logo"
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 5,
-                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
-                    mb: 2,
-                    mx: "auto",
-                  }}
-                />
-              </RouterLink>
-              {/* Segundo Logo */}
-              <RouterLink to="/home">
-                <Box
-                  component="img"
-                  src="/LogoGamma.jpeg" 
-                  alt="Logo Nuevo"
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 5,
-                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
-                    mb: 2,
-                    mx: "auto",
-                  }}
-                />
-              </RouterLink>
-            </Box>
-            <Typography variant="h4" fontWeight={600} sx={{ mb: 1 }}>
-              URL Lists
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 3, fontWeight: 500 }}>
-              Total de URLs: {totalUrls}
-            </Typography>
+        {/* Header superior: logos + back */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            mb: 3,
+            flexWrap: "wrap",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <RouterLink to="/home" style={{ textDecoration: "none" }}>
+              <Box
+                component="img"
+                src="/LogoNetskopeAzul.jpeg"
+                alt="Logo Netskope"
+                sx={{
+                  width: { xs: 56, sm: 64, md: 72 },
+                  height: { xs: 56, sm: 64, md: 72 },
+                  borderRadius: 3,
+                  boxShadow: "0 8px 20px rgba(25, 118, 210, 0.25)",
+                  border: "3px solid rgba(255,255,255,0.85)",
+                }}
+              />
+            </RouterLink>
 
-            {/* Buscador + Crear */}
+            <RouterLink to="/home" style={{ textDecoration: "none" }}>
+              <Box
+                component="img"
+                src="/LogoGamma.jpeg"
+                alt="Logo Gamma"
+                sx={{
+                  width: { xs: 56, sm: 64, md: 72 },
+                  height: { xs: 56, sm: 64, md: 72 },
+                  borderRadius: 3,
+                  boxShadow: "0 8px 20px rgba(25, 118, 210, 0.25)",
+                  border: "3px solid rgba(255,255,255,0.85)",
+                }}
+              />
+            </RouterLink>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Button
+              component={RouterLink}
+              to="/home"
+              variant="contained"
+              sx={{
+                textTransform: "none",
+                fontWeight: 700,
+                borderRadius: "14px",
+                px: 2,
+                background: primaryGradient,
+                boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+                "&:hover": { boxShadow: "0 16px 32px rgba(66, 165, 245, 0.30)" },
+              }}
+            >
+              Volver
+            </Button>
+          </Box>
+        </Box>
+
+        {/* Card principal (glass) */}
+        <Card elevation={0} sx={{ ...glassShellSx }}>
+          <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
+            {/* Título */}
+            <Box sx={{ textAlign: "center", mb: 3 }}>
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: "1.7rem", md: "2.3rem" },
+                  color: "#1a1a1a",
+                  mb: 0.5,
+                }}
+              >
+                URL Lists
+              </Typography>
+
+              <Box sx={{ display: "flex", justifyContent: "center", gap: 1, flexWrap: "wrap" }}>
+                <Chip
+                  label={`Total de URLs: ${totalUrls}`}
+                  sx={{
+                    backgroundColor: "rgba(66, 165, 245, 0.15)",
+                    color: "#1976d2",
+                    fontWeight: 700,
+                    border: "1px solid rgba(66, 165, 245, 0.3)",
+                  }}
+                />
+                <Chip
+                  label={`Listas: ${urlLists.length}`}
+                  sx={{
+                    backgroundColor: "rgba(255, 255, 255, 0.55)",
+                    color: "rgba(0,0,0,0.65)",
+                    fontWeight: 700,
+                    border: "1px solid rgba(255,255,255,0.7)",
+                  }}
+                />
+              </Box>
+            </Box>
+
+            {/* Barra acciones: Crear + Buscar */}
             <Box
               sx={{
                 display: "flex",
                 gap: 2,
                 alignItems: "center",
-                justifyContent: "center",
+                justifyContent: "space-between",
                 mb: 3,
                 flexWrap: "wrap",
               }}
             >
-              <Button variant="contained" onClick={handleOpenCreate} sx={{ textTransform: "none" }}>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleOpenCreate}
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 800,
+                  borderRadius: "14px",
+                  px: 2,
+                  background: primaryGradient,
+                  boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+                  "&:hover": { boxShadow: "0 16px 32px rgba(66, 165, 245, 0.30)" },
+                }}
+              >
                 Crear
               </Button>
 
               <TextField
-                label="Buscar URL List (nombre)"
-                variant="outlined"
-                size="small"
+                placeholder="Buscar por nombre..."
                 value={searchName}
                 onChange={(e) => setSearchName(e.target.value)}
-                sx={{ width: "100%", maxWidth: 400 }}
+                sx={{ width: "100%", maxWidth: 520 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ color: "#1976d2" }} />
+                    </InputAdornment>
+                  ),
+                  sx: {
+                    height: 56,
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255, 255, 255, 0.95)",
+                    backdropFilter: "blur(20px)",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                    border: "2px solid transparent",
+                    transition: "all 0.3s ease",
+                    "&:hover": {
+                      backgroundColor: "white",
+                      boxShadow: "0 12px 32px rgba(66, 165, 245, 0.18)",
+                    },
+                    "&.Mui-focused": {
+                      backgroundColor: "white",
+                      borderColor: "#1976d2",
+                      boxShadow: "0 12px 32px rgba(25, 118, 210, 0.25)",
+                    },
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    input: { fontWeight: 600 },
+                  },
+                }}
               />
             </Box>
 
+            {/* Tabla */}
             {loading ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
                 <CircularProgress />
               </Box>
             ) : (
-              <TableContainer component={Paper} sx={{ maxHeight: 350, mb: 3, overflowX: "auto" }}>
-                <Table stickyHeader size="small" aria-label="url list table" sx={{ minWidth: 800 }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>ID</TableCell>
-                      <TableCell>Nombre</TableCell>
-                      <TableCell>Tipo</TableCell>
-                      <TableCell>Cant. URLs</TableCell>
-                      <TableCell>Modificado por</TableCell>
-                      <TableCell>Fecha Modificación</TableCell>
-                      <TableCell>Acciones</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredUrls.length === 0 ? (
+              <Box
+                sx={{
+                  borderRadius: "20px",
+                  overflow: "hidden",
+                  border: "1px solid rgba(255,255,255,0.9)",
+                  boxShadow: "0 10px 28px rgba(0,0,0,0.08)",
+                  background: "rgba(255,255,255,0.55)",
+                  backdropFilter: "blur(12px)",
+                  mb: 3,
+                }}
+              >
+                <TableContainer
+                  component={Paper}
+                  elevation={0}
+                  sx={{
+                    maxHeight: 380,
+                    background: "transparent",
+                  }}
+                >
+                  <Table stickyHeader size="small" aria-label="url list table" sx={{ minWidth: 900 }}>
+                    <TableHead>
                       <TableRow>
-                        <TableCell colSpan={7} align="center">
-                          No se encontraron resultados
-                        </TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>ID</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Nombre</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Tipo</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Cant. URLs</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Modificado por</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Fecha Modificación</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Acciones</TableCell>
                       </TableRow>
-                    ) : (
-                      filteredUrls.map((list) => (
-                        <TableRow key={list.id}>
-                          <TableCell>{list.id}</TableCell>
-                          <TableCell>{list.name}</TableCell>
-                          <TableCell>{list.data.type}</TableCell>
-                          <TableCell>{list.data.urls.length}</TableCell>
-                          <TableCell>{list.modify_by}</TableCell>
-                          <TableCell>{formatDate(list.modify_time)}</TableCell>
-                          <TableCell>
-                            <Tooltip title="Ver">
-                              <IconButton onClick={() => handleOpenDialog(list, false)} color="primary">
-                                <VisibilityIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Editar">
-                              <IconButton onClick={() => handleOpenDialog(list, true)} sx={{ color: "#FFA726" }}>
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Eliminar">
-                              <IconButton onClick={() => handleDeleteList(list)} color="error">
-                                <DeleteIcon />
-                              </IconButton>
-                            </Tooltip>
+                    </TableHead>
+                    <TableBody>
+                      {filteredUrls.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} align="center">
+                            No se encontraron resultados
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                      ) : (
+                        filteredUrls.map((list) => (
+                          <TableRow
+                            key={list.id}
+                            hover
+                            sx={{
+                              "&:hover td": { backgroundColor: "rgba(66, 165, 245, 0.06)" },
+                            }}
+                          >
+                            <TableCell>{list.id}</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>{list.name}</TableCell>
+                            <TableCell>
+                              <Chip
+                                label={list.data.type}
+                                size="small"
+                                sx={{
+                                  backgroundColor: "rgba(66, 165, 245, 0.12)",
+                                  border: "1px solid rgba(66, 165, 245, 0.25)",
+                                  color: "#1976d2",
+                                  fontWeight: 800,
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>{list.data.urls.length}</TableCell>
+                            <TableCell>{list.modify_by}</TableCell>
+                            <TableCell>{formatDate(list.modify_time)}</TableCell>
+                            <TableCell>
+                              <Tooltip title="Ver">
+                                <IconButton onClick={() => handleOpenDialog(list, false)} color="primary">
+                                  <VisibilityIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Editar">
+                                <IconButton onClick={() => handleOpenDialog(list, true)} sx={{ color: "#FFA726" }}>
+                                  <EditIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Eliminar">
+                                <IconButton onClick={() => handleDeleteList(list)} color="error">
+                                  <DeleteIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
             )}
 
-            {/* Alert de feedback (verde/rojo) */}
+            {/* Feedback */}
             {feedbackMsg.type && (
               <Alert
                 severity={feedbackMsg.type}
                 onClose={() => setFeedbackMsg({ type: null, message: "" })}
-                sx={{ mb: 2, whiteSpace: "pre-line" }}
+                sx={{ mb: 2, whiteSpace: "pre-line", borderRadius: "16px" }}
               >
                 {feedbackMsg.message}
               </Alert>
@@ -482,17 +650,31 @@ export default function URL_List() {
 
             {/* Resumen de creación — CERRABLE */}
             {createSummary && showCreateSummary && (
-              <Paper sx={{ p: 2, mb: 3, position: "relative" }}>
+              <Box
+                sx={{
+                  ...glassShellSx,
+                  p: 2.2,
+                  mb: 3,
+                  position: "relative",
+                  background: "rgba(255,255,255,0.75)",
+                }}
+              >
                 <IconButton
                   size="small"
                   aria-label="cerrar"
                   onClick={() => setShowCreateSummary(false)}
-                  sx={{ position: "absolute", right: 8, top: 8 }}
+                  sx={{
+                    position: "absolute",
+                    right: 10,
+                    top: 10,
+                    background: "rgba(255,255,255,0.9)",
+                    "&:hover": { background: "rgba(255,255,255,1)" },
+                  }}
                 >
                   <CloseIcon fontSize="small" />
                 </IconButton>
 
-                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                <Typography variant="subtitle1" fontWeight={900} gutterBottom>
                   Lista creada
                 </Typography>
                 <Typography variant="body2">
@@ -504,22 +686,36 @@ export default function URL_List() {
                     Rechazados: {createSummary.create.rejected.join(", ")}
                   </Typography>
                 )}
-              </Paper>
+              </Box>
             )}
 
             {/* Resumen del último batch — CERRABLE */}
             {batchSummary && showBatchSummary && (
-              <Paper sx={{ p: 2, mb: 3, position: "relative" }}>
+              <Box
+                sx={{
+                  ...glassShellSx,
+                  p: 2.2,
+                  mb: 3,
+                  position: "relative",
+                  background: "rgba(255,255,255,0.75)",
+                }}
+              >
                 <IconButton
                   size="small"
                   aria-label="cerrar"
                   onClick={() => setShowBatchSummary(false)}
-                  sx={{ position: "absolute", right: 8, top: 8 }}
+                  sx={{
+                    position: "absolute",
+                    right: 10,
+                    top: 10,
+                    background: "rgba(255,255,255,0.9)",
+                    "&:hover": { background: "rgba(255,255,255,1)" },
+                  }}
                 >
                   <CloseIcon fontSize="small" />
                 </IconButton>
 
-                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                <Typography variant="subtitle1" fontWeight={900} gutterBottom>
                   Resumen de la carga
                 </Typography>
                 <Stack
@@ -564,55 +760,70 @@ export default function URL_List() {
                 )}
 
                 <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
+                  <Typography variant="subtitle2" fontWeight={900} gutterBottom>
                     Resultados por lista:
                   </Typography>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>ID</TableCell>
-                        <TableCell>Tipo</TableCell>
-                        <TableCell>Estatus</TableCell>
-                        <TableCell>Enviados</TableCell>
-                        <TableCell>Detalle</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {batchSummary.results.map((r) => (
-                        <TableRow key={`${r.id}-${r.type}`}>
-                          <TableCell>{r.id}</TableCell>
-                          <TableCell>{r.type}</TableCell>
-                          <TableCell>{r.status}</TableCell>
-                          <TableCell>{r.sent ?? "—"}</TableCell>
-                          <TableCell
-                            sx={{
-                              maxWidth: 380,
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {r.error || r.reason || "OK"}
-                          </TableCell>
+                  <Box
+                    sx={{
+                      borderRadius: "16px",
+                      overflow: "hidden",
+                      border: "1px solid rgba(255,255,255,0.9)",
+                      background: "rgba(255,255,255,0.6)",
+                      backdropFilter: "blur(10px)",
+                    }}
+                  >
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 800 }}>ID</TableCell>
+                          <TableCell sx={{ fontWeight: 800 }}>Tipo</TableCell>
+                          <TableCell sx={{ fontWeight: 800 }}>Estatus</TableCell>
+                          <TableCell sx={{ fontWeight: 800 }}>Enviados</TableCell>
+                          <TableCell sx={{ fontWeight: 800 }}>Detalle</TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHead>
+                      <TableBody>
+                        {batchSummary.results.map((r) => (
+                          <TableRow key={`${r.id}-${r.type}`}>
+                            <TableCell>{r.id}</TableCell>
+                            <TableCell>{r.type}</TableCell>
+                            <TableCell>{r.status}</TableCell>
+                            <TableCell>{r.sent ?? "—"}</TableCell>
+                            <TableCell
+                              sx={{
+                                maxWidth: 380,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {r.error || r.reason || "OK"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
                 </Box>
-              </Paper>
+              </Box>
             )}
 
             {/* Acción masiva */}
             <Box
               sx={{
-                borderTop: "1px solid rgba(0,0,0,0.1)",
-                pt: 3,
-                textAlign: "left",
-                maxWidth: 700,
-                mx: "auto",
+                ...glassShellSx,
+                mt: 2,
+                p: { xs: 2.2, md: 3 },
+                background: "rgba(255,255,255,0.75)",
               }}
             >
-              <Typography variant="h6" fontWeight={600} gutterBottom>
+              <Typography
+                sx={{
+                  fontWeight: 900,
+                  fontSize: { xs: "1.1rem", md: "1.25rem" },
+                  mb: 2,
+                }}
+              >
                 Acción masiva
               </Typography>
 
@@ -623,6 +834,12 @@ export default function URL_List() {
                   value={actionType}
                   label="Seleccionar acción"
                   onChange={(e) => setActionType(e.target.value as "append" | "replace")}
+                  sx={{
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  }}
                 >
                   <MenuItem value="append">Añadir</MenuItem>
                   <MenuItem value="replace">Reemplazar</MenuItem>
@@ -636,14 +853,22 @@ export default function URL_List() {
                 size="small"
                 value={idsOrNames}
                 onChange={(e) => setIdsOrNames(e.target.value)}
-                sx={{ mb: 2 }}
+                sx={{
+                  mb: 2,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
                 placeholder="Ej: 77, 79, [Semillero] AllowList"
               />
 
               <FormControlLabel
                 control={<Checkbox checked={allowRegex} onChange={(e) => setAllowRegex(e.target.checked)} />}
                 label="Permitir Regex (solo listas tipo regex)"
-                sx={{ mb: 2 }}
+                sx={{ mb: 1.5 }}
               />
 
               <TextField
@@ -655,7 +880,15 @@ export default function URL_List() {
                 size="small"
                 value={urlsInput}
                 onChange={(e) => setUrlsInput(e.target.value)}
-                sx={{ mb: 3 }}
+                sx={{
+                  mb: 2.5,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
                 placeholder={`example.com
 www.example.com
 *.example.com
@@ -669,51 +902,49 @@ example.com/path/to/page`}
                 onClick={handleSubmit}
                 disabled={loading}
                 sx={{
-                  py: 1.3,
-                  fontWeight: 600,
+                  py: 1.4,
+                  fontWeight: 900,
                   textTransform: "none",
-                  backgroundColor: "#42a5f5",
-                  borderRadius: 2,
-                  boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)",
-                  ":hover": { backgroundColor: "#66b9ff" },
+                  borderRadius: "16px",
+                  background: primaryGradient,
+                  boxShadow: "0 12px 28px rgba(25, 118, 210, 0.28)",
+                  "&:hover": { boxShadow: "0 18px 36px rgba(66, 165, 245, 0.32)" },
                 }}
               >
                 {loading ? <CircularProgress size={24} /> : "Ejecutar Acción"}
               </Button>
             </Box>
 
-            {/* Botón volver */}
-            <Box sx={{ textAlign: "center", mt: 4 }}>
-              <Button
-                component={RouterLink}
-                to="/home"
-                variant="contained"
-                sx={{
-                  py: 1.3,
-                  fontWeight: 600,
-                  textTransform: "none",
-                  backgroundColor: "#42a5f5",
-                  borderRadius: 2,
-                  boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)",
-                  ":hover": { backgroundColor: "#66b9ff" },
-                }}
-              >
-                Volver
-              </Button>
+            {/* Footer */}
+            <Box sx={{ mt: 4, textAlign: "center" }}>
+              <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.5)", fontWeight: 600 }}>
+                &copy; 2026 Api - Netskope
+              </Typography>
+              <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.4)", fontSize: "0.85rem" }}>
+                Equipo de Desarrollo Gamma Ingenieros
+              </Typography>
             </Box>
           </CardContent>
         </Card>
-        {/* Footer */}
-        <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
-          <Typography variant="body2">
-            &copy; 2026 Api - Netskope
-          </Typography>
-          Equipo de Desarrollo Gamma Ingenieros
-        </Box>
       </Box>
+
       {/* Modal ver/editar */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
-        <DialogTitle>
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: "20px",
+            background: "rgba(255,255,255,0.85)",
+            backdropFilter: "blur(18px)",
+            border: "1px solid rgba(255,255,255,0.9)",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.18)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 900 }}>
           {editMode ? "Editar URL List" : "Ver URL List"}
         </DialogTitle>
 
@@ -723,24 +954,37 @@ example.com/path/to/page`}
               <TextField
                 label="Nombre de la lista"
                 fullWidth
-                sx={{ mb: 2 }}
+                sx={{
+                  mb: 2,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
               />
 
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 900 }}>
                 URLs existentes (puedes eliminar con el icono)
               </Typography>
-              <List sx={{ maxHeight: 220, overflowY: "auto", mb: 2 }}>
+              <List
+                sx={{
+                  maxHeight: 220,
+                  overflowY: "auto",
+                  mb: 2,
+                  borderRadius: "16px",
+                  background: "rgba(255,255,255,0.6)",
+                  border: "1px solid rgba(255,255,255,0.9)",
+                }}
+              >
                 {editableUrls.map((url) => (
                   <ListItem
                     key={url}
                     secondaryAction={
-                      <IconButton
-                        edge="end"
-                        onClick={() => handleDeleteUrlFromEdit(url)}
-                        color="error"
-                      >
+                      <IconButton edge="end" onClick={() => handleDeleteUrlFromEdit(url)} color="error">
                         <DeleteIcon />
                       </IconButton>
                     }
@@ -749,7 +993,11 @@ example.com/path/to/page`}
                   </ListItem>
                 ))}
                 {editableUrls.length === 0 && (
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 2 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ textAlign: "center", mt: 2, mb: 2 }}
+                  >
                     No hay URLs en esta lista.
                   </Typography>
                 )}
@@ -765,33 +1013,49 @@ example.com/path/to/page`}
                 placeholder={`example.com
 *.example.com
 sub.dominio.com`}
-                sx={{ mb: 1.5 }}
+                sx={{
+                  mb: 1.5,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
               />
 
               <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={allowRegexEdit}
-                    onChange={(e) => setAllowRegexEdit(e.target.checked)}
-                  />
-                }
+                control={<Checkbox checked={allowRegexEdit} onChange={(e) => setAllowRegexEdit(e.target.checked)} />}
                 label="Permitir Regex (si usas sintaxis regex)"
-                sx={{ mb: 1 }}
+                sx={{ mb: 0.5 }}
               />
             </>
           ) : (
             <>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 900 }}>
                 {selectedList?.name} — {selectedList?.data.type} — {selectedList?.data.urls.length} URLs
               </Typography>
-              <List sx={{ maxHeight: 300, overflowY: "auto" }}>
+
+              <List
+                sx={{
+                  maxHeight: 320,
+                  overflowY: "auto",
+                  borderRadius: "16px",
+                  background: "rgba(255,255,255,0.6)",
+                  border: "1px solid rgba(255,255,255,0.9)",
+                }}
+              >
                 {selectedList?.data.urls.map((url) => (
                   <ListItem key={url}>
                     <ListItemText primary={url} />
                   </ListItem>
                 ))}
                 {selectedList?.data.urls.length === 0 && (
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 2 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ textAlign: "center", mt: 2, mb: 2 }}
+                  >
                     No hay URLs en esta lista.
                   </Typography>
                 )}
@@ -799,10 +1063,26 @@ sub.dominio.com`}
             </>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cerrar</Button>
+
+        <DialogActions sx={{ px: 2.5, py: 2 }}>
+          <Button
+            onClick={handleCloseDialog}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: "14px" }}
+          >
+            Cerrar
+          </Button>
           {editMode && (
-            <Button variant="contained" onClick={handleSaveEdit}>
+            <Button
+              variant="contained"
+              onClick={handleSaveEdit}
+              sx={{
+                textTransform: "none",
+                fontWeight: 900,
+                borderRadius: "14px",
+                background: primaryGradient,
+                boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+              }}
+            >
               Guardar
             </Button>
           )}
@@ -810,23 +1090,40 @@ sub.dominio.com`}
       </Dialog>
 
       {/* Modal Crear */}
-      <Dialog open={openCreate} onClose={handleCloseCreate} fullWidth maxWidth="sm">
-        <DialogTitle>Crear URL List</DialogTitle>
+      <Dialog
+        open={openCreate}
+        onClose={handleCloseCreate}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: "20px",
+            background: "rgba(255,255,255,0.85)",
+            backdropFilter: "blur(18px)",
+            border: "1px solid rgba(255,255,255,0.9)",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.18)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 900 }}>Crear URL List</DialogTitle>
         <DialogContent dividers>
           <TextField
             label="Nombre de la lista"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             fullWidth
-            sx={{ mb: 2 }}
+            sx={{
+              mb: 2,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "16px",
+                backgroundColor: "rgba(255,255,255,0.95)",
+                "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+              },
+            }}
           />
           <FormControlLabel
-            control={
-              <Checkbox
-                checked={newAllowRegex}
-                onChange={(e) => setNewAllowRegex(e.target.checked)}
-              />
-            }
+            control={<Checkbox checked={newAllowRegex} onChange={(e) => setNewAllowRegex(e.target.checked)} />}
             label="Permitir Regex (si contiene sintaxis de regex)"
             sx={{ mb: 2 }}
           />
@@ -842,11 +1139,34 @@ www.example.com
 *.example.com
 sub.domain.com
 example.com/path/to/page`}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "16px",
+                backgroundColor: "rgba(255,255,255,0.95)",
+                "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+              },
+            }}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseCreate}>Cancelar</Button>
-          <Button variant="contained" onClick={handleCreateList}>
+        <DialogActions sx={{ px: 2.5, py: 2 }}>
+          <Button
+            onClick={handleCloseCreate}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: "14px" }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateList}
+            sx={{
+              textTransform: "none",
+              fontWeight: 900,
+              borderRadius: "14px",
+              background: primaryGradient,
+              boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+            }}
+          >
             Crear lista
           </Button>
         </DialogActions>

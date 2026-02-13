@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   TextField,
   Button,
@@ -14,25 +14,41 @@ import { forgot } from "../../services/auth";
 import { Email } from "@mui/icons-material";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 
+const RESET_EMAIL_KEY = "reset_email";
+
 export default function ForgotPage() {
   const [correo, setCorreo] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const nav = useNavigate();
 
+  // ✅ Si ya había un correo guardado (ej: usuario volvió atrás), precargarlo
+  useEffect(() => {
+    const saved = localStorage.getItem(RESET_EMAIL_KEY);
+    if (saved) setCorreo(saved);
+  }, []);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     setLoading(true);
-    try {
-      // 1) solicitamos el envío del correo
-      await forgot({ correo });
 
-      // 2) navegamos a reset-password para que el usuario pegue el token manualmente
+    try {
+      const email = correo.trim();
+
+      // 1) solicitamos el envío del correo
+      await forgot({ correo: email });
+
+      // ✅ Guardar correo para autollenar en reset-password (y luego en login)
+      localStorage.setItem(RESET_EMAIL_KEY, email);
+
+      // 2) navegamos a reset-password y le pasamos el correo por state
       nav("/reset-password", {
         replace: true,
         state: {
-          info: `Si el correo existe, te enviamos un enlace. Copia el token del correo y pégalo aquí.`,
+          fromForgot: true,
+          correo: email,
+          info: `Si el correo existe, te enviamos un código. Escríbelo aquí junto con tu nueva contraseña.`,
         },
       });
     } catch (e: any) {
@@ -75,7 +91,7 @@ export default function ForgotPage() {
         >
           <CardContent sx={{ p: 4 }}>
             {/* Logo */}
-            <Box sx={{ display: 'flex', justifyContent: 'center',gap:3, mb: 3 }}>
+            <Box sx={{ display: "flex", justifyContent: "center", gap: 3, mb: 3 }}>
               <RouterLink to="/home">
                 <Box
                   component="img"
@@ -95,7 +111,7 @@ export default function ForgotPage() {
               <RouterLink to="/home">
                 <Box
                   component="img"
-                  src="/LogoGamma.jpeg" 
+                  src="/LogoGamma.jpeg"
                   alt="Logo Nuevo"
                   sx={{
                     width: 80,
@@ -108,9 +124,11 @@ export default function ForgotPage() {
                 />
               </RouterLink>
             </Box>
+
             <Typography variant="h6" fontWeight={600} align="center" sx={{ mb: 1 }}>
               ¿Olvidaste tu contraseña?
             </Typography>
+
             <Typography
               variant="body2"
               align="center"
@@ -165,19 +183,19 @@ export default function ForgotPage() {
                     variant="outlined"
                     component={RouterLink}
                     to="/login"
-                    sx={{              
+                    sx={{
                       py: 1.3,
                       fontWeight: 600,
-                      backgroundColor: '#ffffff',
-                      borderColor: '#42a5f5',
-                      color: '#42a5f5',
+                      backgroundColor: "#ffffff",
+                      borderColor: "#42a5f5",
+                      color: "#42a5f5",
                       textTransform: "none",
                       borderRadius: 2,
-                      boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
+                      boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)",
                       "&:hover": {
-                        backgroundColor: '#e3f2fd',
-                        borderColor: '#1e88e5',
-                        color: '#1e88e5',
+                        backgroundColor: "#e3f2fd",
+                        borderColor: "#1e88e5",
+                        color: "#1e88e5",
                       },
                     }}
                   >
@@ -191,9 +209,7 @@ export default function ForgotPage() {
 
         {/* Footer */}
         <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
-          <Typography variant="body2">
-            &copy; 2026 Api - Netskope
-          </Typography>
+          <Typography variant="body2">&copy; 2026 Api - Netskope</Typography>
           Equipo de Desarrollo Gamma Ingenieros
         </Box>
       </Box>

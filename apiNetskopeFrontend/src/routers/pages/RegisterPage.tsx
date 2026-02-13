@@ -10,8 +10,15 @@ import {
   Typography,
   Box,
   InputAdornment,
+  IconButton,
 } from '@mui/material';
-import { Email, Lock, AccountCircle } from '@mui/icons-material';
+import {
+  Email,
+  Lock,
+  AccountCircle,
+  Visibility,
+  VisibilityOff,
+} from '@mui/icons-material';
 import { register } from '../../services/auth';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 
@@ -20,6 +27,7 @@ export default function RegisterPage() {
   const [apellido, setApellido] = useState('');
   const [correo, setCorreo] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const nav = useNavigate();
@@ -28,8 +36,17 @@ export default function RegisterPage() {
     e.preventDefault();
     setErr(null);
     setMsg(null);
+
+    // Guardamos el correo actual antes de limpiar el state
+    const correoToVerify = correo.trim();
+
     try {
-      const res = await register({ nombre, apellido, correo, password });
+      const res = await register({
+        nombre,
+        apellido,
+        correo: correoToVerify,
+        password,
+      });
       setMsg(res.message);
 
       // Limpiar campos después de registro exitoso
@@ -38,10 +55,10 @@ export default function RegisterPage() {
       setCorreo('');
       setPassword('');
 
-      setTimeout(
-        () => nav(`/verify?correo=${encodeURIComponent(correo)}`),
-        800
-      );
+      setTimeout(() => {
+        // ✅ Pasamos el correo SOLO en state (no en URL)
+        nav('/verify', { state: { correo: correoToVerify } });
+      }, 800);
     } catch (e: any) {
       setErr(e?.response?.data?.detail || 'Error al registrar');
     }
@@ -66,7 +83,8 @@ export default function RegisterPage() {
           backgroundColor: 'white',
           borderRadius: '12px',
           padding: '40px',
-          background: 'linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)',
+          background:
+            'linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)',
           boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
         }}
       >
@@ -81,7 +99,7 @@ export default function RegisterPage() {
         >
           <CardContent sx={{ p: 4 }}>
             {/* Logo */}
-            <Box sx={{ display: 'flex', justifyContent: 'center',gap:3, mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mb: 3 }}>
               <RouterLink to="/home">
                 <Box
                   component="img"
@@ -91,9 +109,9 @@ export default function RegisterPage() {
                     width: 80,
                     height: 80,
                     borderRadius: 5,
-                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                    boxShadow: '0 6px 12px rgba(0, 0, 0, 0.4)',
                     mb: 2,
-                    mx: "auto",
+                    mx: 'auto',
                   }}
                 />
               </RouterLink>
@@ -101,25 +119,21 @@ export default function RegisterPage() {
               <RouterLink to="/home">
                 <Box
                   component="img"
-                  src="/LogoGamma.jpeg" 
+                  src="/LogoGamma.jpeg"
                   alt="Logo Nuevo"
                   sx={{
                     width: 80,
                     height: 80,
                     borderRadius: 5,
-                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                    boxShadow: '0 6px 12px rgba(0, 0, 0, 0.4)',
                     mb: 2,
-                    mx: "auto",
+                    mx: 'auto',
                   }}
                 />
               </RouterLink>
             </Box>
-            <Typography
-              variant="h6"
-              fontWeight={600}
-              align="center"
-              sx={{ mb: 1 }}
-            >
+
+            <Typography variant="h6" fontWeight={600} align="center" sx={{ mb: 1 }}>
               Crear cuenta
             </Typography>
             <Typography
@@ -131,12 +145,17 @@ export default function RegisterPage() {
               Únete a nuestra plataforma
             </Typography>
 
-            <form onSubmit={onSubmit} autoComplete='off'>
+            <form onSubmit={onSubmit} autoComplete="off">
               <Stack spacing={2}>
-                <div style={{ display: "none" }} aria-hidden>
+                <div style={{ display: 'none' }} aria-hidden>
                   <input name="prevent_autofill_username" autoComplete="username" />
-                  <input name="prevent_autofill_password" type="password" autoComplete="new-password" />
+                  <input
+                    name="prevent_autofill_password"
+                    type="password"
+                    autoComplete="new-password"
+                  />
                 </div>
+
                 {/* Mensajes de éxito o error */}
                 {msg && <Alert severity="success">{msg}</Alert>}
                 {err && <Alert severity="error">{err}</Alert>}
@@ -190,10 +209,10 @@ export default function RegisterPage() {
                   }}
                 />
 
-                {/* Contraseña */}
+                {/* Contraseña (con 👁️) */}
                 <TextField
                   label="Contraseña"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   fullWidth
@@ -204,10 +223,22 @@ export default function RegisterPage() {
                         <Lock color="action" />
                       </InputAdornment>
                     ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label={
+                            showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'
+                          }
+                          onClick={() => setShowPassword((v) => !v)}
+                          edge="end"
+                        >
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
                   }}
                 />
 
-              
                 {/* Botón de registro */}
                 <Button
                   variant="contained"
@@ -239,10 +270,8 @@ export default function RegisterPage() {
         </Card>
 
         {/* Footer */}
-        <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
-          <Typography variant="body2">
-            &copy; 2026 Api - Netskope
-          </Typography>
+        <Box sx={{ mt: 4, textAlign: 'center', color: 'text.secondary' }}>
+          <Typography variant="body2">&copy; 2026 Api - Netskope</Typography>
           Equipo de Desarrollo Gamma Ingenieros
         </Box>
       </Box>

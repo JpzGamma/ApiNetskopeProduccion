@@ -29,6 +29,8 @@ import {
   Autocomplete,
   Chip,
   Switch,
+  Divider,
+  Stack,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import AddIcon from "@mui/icons-material/Add";
@@ -54,7 +56,10 @@ export default function PrivateApps() {
   const [filteredApps, setFilteredApps] = useState<PrivateAppType[]>([]);
   const [publishers, setPublishers] = useState<PublisherType[]>([]);
   const [loading, setLoading] = useState(false);
-  const [feedbackMsg, setFeedbackMsg] = useState<{ type: "error" | "success" | null; message: string }>({ type: null, message: "" });
+  const [feedbackMsg, setFeedbackMsg] = useState<{ type: "error" | "success" | null; message: string }>({
+    type: null,
+    message: "",
+  });
   const [search, setSearch] = useState("");
 
   const [openModal, setOpenModal] = useState(false);
@@ -172,6 +177,7 @@ export default function PrivateApps() {
 
   const handleDeleteApp = async (app_id?: number) => {
     if (!app_id) return;
+    // eslint-disable-next-line no-restricted-globals
     if (!window.confirm("¿Seguro que deseas eliminar esta Private App?")) return;
     setLoading(true);
     try {
@@ -218,82 +224,281 @@ export default function PrivateApps() {
       .filter(Boolean) as string[];
   };
 
+  // --- estilos reutilizables (solo UI) ---
+  const glassShellSx = {
+    borderRadius: "20px",
+    background: "rgba(255, 255, 255, 0.8)",
+    backdropFilter: "blur(20px)",
+    border: "2px solid rgba(255, 255, 255, 0.8)",
+    boxShadow: "0 12px 32px rgba(0, 0, 0, 0.10)",
+  } as const;
+
+  const primaryGradient = "linear-gradient(135deg, #42a5f5, #1976d2)";
+
+  const chipTypeSx = {
+    backgroundColor: "rgba(66, 165, 245, 0.12)",
+    border: "1px solid rgba(66, 165, 245, 0.25)",
+    color: "#1976d2",
+    fontWeight: 800,
+  } as const;
+
   return (
     <Box
       sx={{
         minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        p: 2,
         background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      {/* Tarjeta central */}
+      {/* blobs decorativos */}
       <Box
         sx={{
-          backgroundColor: "white",
-          borderRadius: 3,
-          boxShadow: "0 8px 16px rgba(0,0,0,0.1)",
+          position: "absolute",
+          top: "-10%",
+          right: "-5%",
+          width: 520,
+          height: 520,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(66, 165, 245, 0.2) 0%, transparent 70%)",
+          filter: "blur(60px)",
+        }}
+      />
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: "-12%",
+          left: "-6%",
+          width: 430,
+          height: 430,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(163, 201, 241, 0.3) 0%, transparent 70%)",
+          filter: "blur(50px)",
+        }}
+      />
+
+      {/* Contenedor principal */}
+      <Box
+        sx={{
+          position: "relative",
+          zIndex: 1,
           maxWidth: 1500,
-          width: "100%",
-          p: 3,
-          background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+          mx: "auto",
+          px: { xs: 2, md: 6 },
+          pt: { xs: 2, md: 4 },
+          pb: 6,
         }}
       >
-        <Card elevation={0} sx={{ background: "transparent", boxShadow: "none" }}>
-          <CardContent sx={{ textAlign: "center" }}>
-            {/* Logos */}
-            <Box sx={{ display: "flex", justifyContent: "center", gap: 3, mb: 3 }}>
-              <RouterLink to="/home">
-                <Box component="img" src="/LogoNetskopeAzul.jpeg" alt="Logo" sx={{ width: 80, height: 80, borderRadius: 5, boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)", mb: 2 }} />
-              </RouterLink>
-              <RouterLink to="/home">
-                <Box component="img" src="/LogoGamma.jpeg" alt="Logo Nuevo" sx={{ width: 80, height: 80, borderRadius: 5, boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)", mb: 2 }} />
-              </RouterLink>
+        {/* Header superior: logos + back */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            mb: 3,
+            flexWrap: "wrap",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <RouterLink to="/home" style={{ textDecoration: "none" }}>
+              <Box
+                component="img"
+                src="/LogoNetskopeAzul.jpeg"
+                alt="Logo Netskope"
+                sx={{
+                  width: { xs: 56, sm: 64, md: 72 },
+                  height: { xs: 56, sm: 64, md: 72 },
+                  borderRadius: 3,
+                  boxShadow: "0 8px 20px rgba(25, 118, 210, 0.25)",
+                  border: "3px solid rgba(255,255,255,0.85)",
+                }}
+              />
+            </RouterLink>
+
+            <RouterLink to="/home" style={{ textDecoration: "none" }}>
+              <Box
+                component="img"
+                src="/LogoGamma.jpeg"
+                alt="Logo Gamma"
+                sx={{
+                  width: { xs: 56, sm: 64, md: 72 },
+                  height: { xs: 56, sm: 64, md: 72 },
+                  borderRadius: 3,
+                  boxShadow: "0 8px 20px rgba(25, 118, 210, 0.25)",
+                  border: "3px solid rgba(255,255,255,0.85)",
+                }}
+              />
+            </RouterLink>
+          </Box>
+
+          <Button
+            component={RouterLink}
+            to="/home"
+            variant="contained"
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: "14px",
+              px: 2.2,
+              background: primaryGradient,
+              boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+              "&:hover": { boxShadow: "0 16px 32px rgba(66, 165, 245, 0.30)" },
+            }}
+          >
+            Volver
+          </Button>
+        </Box>
+
+        {/* Card principal (glass) */}
+        <Card elevation={0} sx={{ ...glassShellSx }}>
+          <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
+            {/* Título */}
+            <Box sx={{ textAlign: "center", mb: 3 }}>
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: "1.7rem", md: "2.3rem" },
+                  color: "#1a1a1a",
+                  mb: 0.5,
+                }}
+              >
+                Private Apps
+              </Typography>
+
+              <Box sx={{ display: "flex", justifyContent: "center", gap: 1, flexWrap: "wrap" }}>
+                <Chip
+                  label={`Total de apps: ${apps.length}`}
+                  sx={{
+                    backgroundColor: "rgba(66, 165, 245, 0.15)",
+                    color: "#1976d2",
+                    fontWeight: 700,
+                    border: "1px solid rgba(66, 165, 245, 0.3)",
+                  }}
+                />
+                <Chip
+                  label={`Publishers: ${publishers.length}`}
+                  sx={{
+                    backgroundColor: "rgba(255, 255, 255, 0.55)",
+                    color: "rgba(0,0,0,0.65)",
+                    fontWeight: 700,
+                    border: "1px solid rgba(255,255,255,0.7)",
+                  }}
+                />
+              </Box>
             </Box>
 
-            <Typography variant="h4" fontWeight={600} sx={{ mb: 1 }}>
-              Private Apps
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 3, fontWeight: 500 }}>
-              Total de apps: {apps.length}
-            </Typography>
-
-            {/* Búsqueda y botones */}
-            <Box sx={{ display: "flex", justifyContent: "center", gap: 2, flexWrap: "wrap", mb: 3 }}>
+            {/* Barra acciones: buscar + botones */}
+            <Box
+              sx={{
+                display: "flex",
+                gap: 2,
+                alignItems: "center",
+                justifyContent: "space-between",
+                mb: 3,
+                flexWrap: "wrap",
+              }}
+            >
               <TextField
-                label="Buscar por nombre o ID"
+                placeholder="Buscar por nombre o ID..."
                 variant="outlined"
                 size="small"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                sx={{ width: "100%", maxWidth: 400 }}
+                sx={{ width: "100%", maxWidth: 520 }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchIcon />
+                      <SearchIcon sx={{ color: "#1976d2" }} />
                     </InputAdornment>
                   ),
+                  sx: {
+                    height: 56,
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255, 255, 255, 0.95)",
+                    backdropFilter: "blur(20px)",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                    border: "2px solid transparent",
+                    transition: "all 0.3s ease",
+                    "&:hover": {
+                      backgroundColor: "white",
+                      boxShadow: "0 12px 32px rgba(66, 165, 245, 0.18)",
+                    },
+                    "&.Mui-focused": {
+                      backgroundColor: "white",
+                      borderColor: "#1976d2",
+                      boxShadow: "0 12px 32px rgba(25, 118, 210, 0.25)",
+                    },
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    input: { fontWeight: 600 },
+                  },
                 }}
               />
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                sx={{ backgroundColor: "#42a5f5", ":hover": { backgroundColor: "#66b9ff" } }}
-                onClick={() => handleOpenModal()}
+
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 1.2,
+                  flexWrap: "wrap",
+                  width: { xs: "100%", md: "auto" },
+                  justifyContent: { xs: "stretch", md: "flex-end" },
+                }}
               >
-                Nueva Private App
-              </Button>
-              <Button variant="outlined" startIcon={<UploadFileIcon />} component="label">
-                Subir CSV/XLSX
-                <input type="file" hidden onChange={(e) => setBulkFile(e.target.files?.[0] || null)} />
-              </Button>
-              {bulkFile && (
-                <Button variant="contained" onClick={handleBulkUpload}>
-                  Cargar {bulkFile.name}
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => handleOpenModal()}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 900,
+                    borderRadius: "14px",
+                    px: 2,
+                    background: primaryGradient,
+                    boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+                    "&:hover": { boxShadow: "0 16px 32px rgba(66, 165, 245, 0.30)" },
+                    flex: { xs: 1, sm: "unset" },
+                  }}
+                >
+                  Nueva Private App
                 </Button>
-              )}
+
+                <Button
+                  variant="outlined"
+                  startIcon={<UploadFileIcon />}
+                  component="label"
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 800,
+                    borderRadius: "14px",
+                    borderColor: "rgba(25,118,210,0.35)",
+                    backgroundColor: "rgba(255,255,255,0.65)",
+                    "&:hover": { backgroundColor: "rgba(255,255,255,0.85)" },
+                    flex: { xs: 1, sm: "unset" },
+                  }}
+                >
+                  Subir CSV/XLSX
+                  <input type="file" hidden onChange={(e) => setBulkFile(e.target.files?.[0] || null)} />
+                </Button>
+
+                {bulkFile && (
+                  <Button
+                    variant="contained"
+                    onClick={handleBulkUpload}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 900,
+                      borderRadius: "14px",
+                      px: 2,
+                      background: primaryGradient,
+                      boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+                      "&:hover": { boxShadow: "0 16px 32px rgba(66, 165, 245, 0.30)" },
+                      flex: { xs: 1, sm: "unset" },
+                    }}
+                  >
+                    Cargar {bulkFile.name}
+                  </Button>
+                )}
+              </Box>
             </Box>
 
             {/* Tabla */}
@@ -302,121 +507,219 @@ export default function PrivateApps() {
                 <CircularProgress />
               </Box>
             ) : (
-              <TableContainer component={Paper} sx={{ maxHeight: 600, mb: 3, overflowX: "auto" }}>
-                <Table stickyHeader size="small" sx={{ minWidth: 900 }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>ID</TableCell>
-                      <TableCell>Nombre</TableCell>
-                      <TableCell>Host</TableCell>
-                      <TableCell>Protocols</TableCell>
-                      <TableCell>Publishers</TableCell>
-                      <TableCell>Tags</TableCell>
-                      <TableCell align="center">Acciones</TableCell>
-                      <TableCell align="center">Políticas</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredApps.length === 0 ? (
+              <Box
+                sx={{
+                  borderRadius: "20px",
+                  overflow: "hidden",
+                  border: "1px solid rgba(255,255,255,0.9)",
+                  boxShadow: "0 10px 28px rgba(0,0,0,0.08)",
+                  background: "rgba(255,255,255,0.55)",
+                  backdropFilter: "blur(12px)",
+                  mb: 3,
+                }}
+              >
+                <TableContainer component={Paper} elevation={0} sx={{ maxHeight: 600, background: "transparent" }}>
+                  <Table stickyHeader size="small" sx={{ minWidth: 1100 }} aria-label="private apps table">
+                    <TableHead>
                       <TableRow>
-                        <TableCell colSpan={8} align="center">
-                          No hay Private Apps
+                        <TableCell sx={{ fontWeight: 800 }}>ID</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Nombre</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Host</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Protocols</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Publishers</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Tags</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }} align="center">
+                          Acciones
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 800 }} align="center">
+                          Políticas
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      filteredApps.map((a) => {
-                        const protocolsDisplay =
-                          a.protocols && a.protocols.length > 0
-                            ? a.protocols.map((p) => `${p.transport || p.type}:${p.port}`).join(", ")
-                            : "N/A";
-                        const publishersDisplay =
-                          a.publishers && a.publishers.length > 0
-                            ? a.publishers.map((p) => p.publisher_name || "Sin nombre").join(", ")
-                            : "N/A";
-                        const tagsList = formatTagsForDisplay(a.tags || a.labels);
-                        return (
-                          <TableRow key={a.app_id}>
-                            <TableCell>{a.app_id}</TableCell>
-                            <TableCell>{a.app_name || "N/A"}</TableCell>
-                            <TableCell>
-                              <Tooltip title={a.host || "N/A"}>
-                                <span style={{ display: "inline-block", maxWidth: 150, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                  {a.host || "N/A"}
-                                </span>
-                              </Tooltip>
-                            </TableCell>
-                            <TableCell>
-                              <Tooltip title={protocolsDisplay}>
-                                <span style={{ display: "inline-block", maxWidth: 120, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                  {protocolsDisplay}
-                                </span>
-                              </Tooltip>
-                            </TableCell>
-                            <TableCell>{publishersDisplay}</TableCell>
-                            <TableCell>{tagsList.length > 0 ? tagsList.join(", ") : "Sin tags"}</TableCell>
-                            <TableCell align="center">
-                              <Tooltip title="Editar">
-                                <IconButton sx={{ color: "#FFA726" }} onClick={() => handleOpenModal(a)}>
-                                  <EditIcon />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Ver">
-                                <IconButton color="primary" onClick={() => handleOpenViewModal(a)}>
-                                  <VisibilityIcon />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Eliminar">
-                                <IconButton color="error" onClick={() => handleDeleteApp(a.app_id)}>
-                                  <DeleteIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </TableCell>
-                            <TableCell align="center">
-                              <Button
-                                component={RouterLink}
-                                to={`/policies?new=1&fromApp=${encodeURIComponent(a.app_name || "")}`}
-                                variant="outlined"
-                                size="small"
-                              >
-                                Crear Política
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                    </TableHead>
+
+                    <TableBody>
+                      {filteredApps.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} align="center">
+                            No hay Private Apps
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredApps.map((a) => {
+                          const protocolsDisplay =
+                            a.protocols && a.protocols.length > 0
+                              ? a.protocols.map((p) => `${p.transport || p.type}:${p.port}`).join(", ")
+                              : "N/A";
+                          const publishersDisplay =
+                            a.publishers && a.publishers.length > 0
+                              ? a.publishers.map((p) => p.publisher_name || "Sin nombre").join(", ")
+                              : "N/A";
+                          const tagsList = formatTagsForDisplay(a.tags || a.labels);
+
+                          return (
+                            <TableRow
+                              key={a.app_id}
+                              hover
+                              sx={{
+                                "&:hover td": { backgroundColor: "rgba(66, 165, 245, 0.06)" },
+                              }}
+                            >
+                              <TableCell>{a.app_id}</TableCell>
+                              <TableCell sx={{ fontWeight: 700 }}>{a.app_name || "N/A"}</TableCell>
+
+                              <TableCell>
+                                <Tooltip title={a.host || "N/A"}>
+                                  <span
+                                    style={{
+                                      display: "inline-block",
+                                      maxWidth: 180,
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {a.host || "N/A"}
+                                  </span>
+                                </Tooltip>
+                              </TableCell>
+
+                              <TableCell>
+                                <Tooltip title={protocolsDisplay}>
+                                  <span
+                                    style={{
+                                      display: "inline-block",
+                                      maxWidth: 180,
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {protocolsDisplay}
+                                  </span>
+                                </Tooltip>
+                              </TableCell>
+
+                              <TableCell>
+                                <Tooltip title={publishersDisplay}>
+                                  <span
+                                    style={{
+                                      display: "inline-block",
+                                      maxWidth: 220,
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {publishersDisplay}
+                                  </span>
+                                </Tooltip>
+                              </TableCell>
+
+                              <TableCell>
+                                {tagsList.length > 0 ? (
+                                  <Box sx={{ display: "flex", gap: 0.8, flexWrap: "wrap", maxWidth: 260 }}>
+                                    {tagsList.slice(0, 3).map((t) => (
+                                      <Chip key={t} size="small" label={t} sx={chipTypeSx} />
+                                    ))}
+                                    {tagsList.length > 3 && (
+                                      <Chip size="small" label={`+${tagsList.length - 3}`} sx={chipTypeSx} />
+                                    )}
+                                  </Box>
+                                ) : (
+                                  "Sin tags"
+                                )}
+                              </TableCell>
+
+                              <TableCell align="center">
+                                <Tooltip title="Editar">
+                                  <IconButton sx={{ color: "#FFA726" }} onClick={() => handleOpenModal(a)}>
+                                    <EditIcon />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Ver">
+                                  <IconButton color="primary" onClick={() => handleOpenViewModal(a)}>
+                                    <VisibilityIcon />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Eliminar">
+                                  <IconButton color="error" onClick={() => handleDeleteApp(a.app_id)}>
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              </TableCell>
+
+                              <TableCell align="center">
+                                <Button
+                                  component={RouterLink}
+                                  to={`/policies?new=1&fromApp=${encodeURIComponent(a.app_name || "")}`}
+                                  variant="outlined"
+                                  size="small"
+                                  sx={{
+                                    textTransform: "none",
+                                    fontWeight: 800,
+                                    borderRadius: "12px",
+                                    borderColor: "rgba(25,118,210,0.35)",
+                                    backgroundColor: "rgba(255,255,255,0.55)",
+                                    "&:hover": { backgroundColor: "rgba(255,255,255,0.85)" },
+                                  }}
+                                >
+                                  Crear Política
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
             )}
 
+            {/* Feedback */}
             {feedbackMsg.type && (
-              <Alert severity={feedbackMsg.type} onClose={() => setFeedbackMsg({ type: null, message: "" })} sx={{ mb: 2 }}>
+              <Alert
+                severity={feedbackMsg.type}
+                onClose={() => setFeedbackMsg({ type: null, message: "" })}
+                sx={{ mb: 2, borderRadius: "16px" }}
+              >
                 {feedbackMsg.message}
               </Alert>
             )}
-            <Box sx={{ textAlign: "center", mt: 2 }}>
-              <Button
-                component={RouterLink}
-                to="/home"
-                variant="contained"
-                sx={{ py: 1.3, fontWeight: 600, textTransform: "none", backgroundColor: "#42a5f5", borderRadius: 2, boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)", ":hover": { backgroundColor: "#66b9ff" } }}
-              >
-                Volver
-              </Button>
-            </Box>
-            <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
-              <Typography variant="body2">&copy; 2026 Api - Netskope</Typography>
-              
-             Equipo de Desarrollo Gamma Ingenieros
+
+            {/* Footer */}
+            <Box sx={{ mt: 4, textAlign: "center" }}>
+              <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.5)", fontWeight: 600 }}>
+                &copy; 2026 Api - Netskope
+              </Typography>
+              <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.4)", fontSize: "0.85rem" }}>
+                Equipo de Desarrollo Gamma Ingenieros
+              </Typography>
             </Box>
           </CardContent>
         </Card>
       </Box>
 
       {/* Modal Crear / Editar */}
-      <Dialog open={openModal} onClose={handleCloseModal} fullWidth maxWidth="sm">
-        <DialogTitle>{editingApp ? "Editar Private App" : "Nueva Private App"}</DialogTitle>
+      <Dialog
+        open={openModal}
+        onClose={handleCloseModal}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: "20px",
+            background: "rgba(255,255,255,0.85)",
+            backdropFilter: "blur(18px)",
+            border: "1px solid rgba(255,255,255,0.9)",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.18)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 900 }}>
+          {editingApp ? "Editar Private App" : "Nueva Private App"}
+        </DialogTitle>
+
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           {/* Nombre */}
           <TextField
@@ -424,6 +727,14 @@ export default function PrivateApps() {
             fullWidth
             value={formData.app_name || ""}
             onChange={(e) => setFormData({ ...formData, app_name: e.target.value })}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "16px",
+                backgroundColor: "rgba(255,255,255,0.95)",
+                "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+              },
+            }}
           />
 
           {/* Hosts múltiples */}
@@ -438,17 +749,49 @@ export default function PrivateApps() {
                   newHosts[idx] = e.target.value;
                   setFormData({ ...formData, hostsArray: newHosts });
                 }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
               />
+
               {idx === (formData.hostsArray?.length || 1) - 1 && (
                 <IconButton
                   color="primary"
-                  onClick={() => setFormData({ ...formData, hostsArray: [...(formData.hostsArray || []), ""] })}
+                  onClick={() =>
+                    setFormData({ ...formData, hostsArray: [...(formData.hostsArray || []), ""] })
+                  }
+                  sx={{
+                    borderRadius: "14px",
+                    background: "rgba(66,165,245,0.12)",
+                    border: "1px solid rgba(66,165,245,0.25)",
+                    "&:hover": { background: "rgba(66,165,245,0.18)" },
+                  }}
                 >
                   <AddIcon />
                 </IconButton>
               )}
+
               {formData.hostsArray.length > 1 && (
-                <IconButton color="error" onClick={() => setFormData({ ...formData, hostsArray: formData.hostsArray.filter((_, i) => i !== idx) })}>
+                <IconButton
+                  color="error"
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      hostsArray: formData.hostsArray.filter((_, i) => i !== idx),
+                    })
+                  }
+                  sx={{
+                    borderRadius: "14px",
+                    background: "rgba(244,67,54,0.08)",
+                    border: "1px solid rgba(244,67,54,0.20)",
+                    "&:hover": { background: "rgba(244,67,54,0.12)" },
+                  }}
+                >
                   <DeleteIcon />
                 </IconButton>
               )}
@@ -458,7 +801,17 @@ export default function PrivateApps() {
           {/* Protocolos múltiples */}
           {formData.protocols?.map((p: any, i: number) => (
             <Box key={i} sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-              <FormControl fullWidth>
+              <FormControl
+                fullWidth
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
+              >
                 <InputLabel>Tipo</InputLabel>
                 <Select
                   value={p.transport || p.type}
@@ -473,6 +826,7 @@ export default function PrivateApps() {
                   <MenuItem value="udp">UDP</MenuItem>
                 </Select>
               </FormControl>
+
               <TextField
                 label="Puerto"
                 type="number"
@@ -482,7 +836,17 @@ export default function PrivateApps() {
                   newProtocols[i] = { ...newProtocols[i], port: e.target.value };
                   setFormData({ ...formData, protocols: newProtocols });
                 }}
+                sx={{
+                  width: 160,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
               />
+
               <IconButton
                 color="error"
                 onClick={() => {
@@ -490,11 +854,18 @@ export default function PrivateApps() {
                   newProtocols.splice(i, 1);
                   setFormData({ ...formData, protocols: newProtocols });
                 }}
+                sx={{
+                  borderRadius: "14px",
+                  background: "rgba(244,67,54,0.08)",
+                  border: "1px solid rgba(244,67,54,0.20)",
+                  "&:hover": { background: "rgba(244,67,54,0.12)" },
+                }}
               >
                 <DeleteIcon />
               </IconButton>
             </Box>
           ))}
+
           <Button
             variant="outlined"
             onClick={() =>
@@ -503,6 +874,14 @@ export default function PrivateApps() {
                 protocols: [...(formData.protocols || []), { transport: "tcp", port: "" }],
               })
             }
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: "14px",
+              borderColor: "rgba(25,118,210,0.35)",
+              backgroundColor: "rgba(255,255,255,0.65)",
+              "&:hover": { backgroundColor: "rgba(255,255,255,0.85)" },
+            }}
           >
             + Agregar Protocolo
           </Button>
@@ -516,14 +895,23 @@ export default function PrivateApps() {
             onChange={(_, newValue) => setFormData({ ...formData, publishers: newValue })}
             renderTags={(value, getTagProps) =>
               value.map((option, index) => (
-                <Chip
-                  variant="outlined"
-                  label={option.publisher_name}
-                  {...getTagProps({ index })}
-                />
+                <Chip variant="outlined" label={option.publisher_name} {...getTagProps({ index })} />
               ))
             }
-            renderInput={(params) => <TextField {...params} label="Publishers" />}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Publishers"
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
+              />
+            )}
           />
 
           {/* Tags */}
@@ -531,74 +919,212 @@ export default function PrivateApps() {
             multiple
             freeSolo
             options={[]}
-            value={(formData.tags || []).map((t: any) =>
-              typeof t === "string" ? t : t.tag_name
-            )}
+            value={(formData.tags || []).map((t: any) => (typeof t === "string" ? t : t.tag_name))}
             onChange={(_, newValue) =>
               setFormData({
                 ...formData,
-                tags: newValue.map((t: any) =>
-                  typeof t === "string" ? t : t.tag_name
-                ),
+                tags: newValue.map((t: any) => (typeof t === "string" ? t : t.tag_name)),
               })
             }
             renderTags={(value: readonly string[], getTagProps) =>
               value.map((option: string, index: number) => (
-                <Chip
-                  variant="outlined"
-                  label={String(option)}
-                  {...getTagProps({ index })}
-                />
+                <Chip variant="outlined" label={String(option)} {...getTagProps({ index })} />
               ))
             }
-            renderInput={(params) => <TextField {...params} label="Tags" />}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Tags"
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
+              />
+            )}
           />
 
           {/* Switch */}
-          <FormControl>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box
+            sx={{
+              ...glassShellSx,
+              p: 1.8,
+              background: "rgba(255,255,255,0.75)",
+            }}
+          >
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+              justifyContent="space-between"
+            >
+              <Box>
+                <Typography sx={{ fontWeight: 900 }}>Usar Publisher DNS</Typography>
+                <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.6)" }}>
+                  Activa esta opción si la Private App debe resolver por DNS del Publisher.
+                </Typography>
+              </Box>
+
               <Switch
                 checked={!!formData.usePublisherDns}
                 onChange={(e) => setFormData({ ...formData, usePublisherDns: e.target.checked })}
               />
-              <Typography>Usar Publisher DNS</Typography>
-            </Box>
-          </FormControl>
+            </Stack>
+          </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseModal}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSaveApp}>
+
+        <DialogActions sx={{ px: 2.5, py: 2 }}>
+          <Button
+            onClick={handleCloseModal}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: "14px" }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveApp}
+            sx={{
+              textTransform: "none",
+              fontWeight: 900,
+              borderRadius: "14px",
+              background: primaryGradient,
+              boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+              "&:hover": { boxShadow: "0 16px 32px rgba(66, 165, 245, 0.30)" },
+            }}
+          >
             {editingApp ? "Guardar" : "Crear"}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Modal Ver */}
-      <Dialog open={openViewModal} onClose={handleCloseViewModal} fullWidth maxWidth="sm">
-        <DialogTitle>Detalles de Private App</DialogTitle>
+      <Dialog
+        open={openViewModal}
+        onClose={handleCloseViewModal}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: "20px",
+            background: "rgba(255,255,255,0.85)",
+            backdropFilter: "blur(18px)",
+            border: "1px solid rgba(255,255,255,0.9)",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.18)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 900 }}>Detalles de Private App</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           {selectedApp && (
             <>
-              <TextField label="ID" fullWidth value={selectedApp.app_id ?? "N/A"} InputProps={{ readOnly: true }} disabled/>
-              <TextField label="Nombre" fullWidth value={selectedApp.app_name || "N/A"} InputProps={{ readOnly: true }} disabled/>
-              <TextField label="Host" fullWidth value={selectedApp.host || "N/A"} InputProps={{ readOnly: true }} disabled/>
+              <TextField
+                label="ID"
+                fullWidth
+                value={selectedApp.app_id ?? "N/A"}
+                InputProps={{ readOnly: true }}
+                disabled
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
+              />
+              <TextField
+                label="Nombre"
+                fullWidth
+                value={selectedApp.app_name || "N/A"}
+                InputProps={{ readOnly: true }}
+                disabled
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
+              />
+              <TextField
+                label="Host"
+                fullWidth
+                value={selectedApp.host || "N/A"}
+                InputProps={{ readOnly: true }}
+                disabled
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
+              />
 
+              <Divider sx={{ my: 0.5 }} />
+
+              <Typography sx={{ fontWeight: 900 }}>Protocolos</Typography>
               {selectedApp.protocols?.map((p, i) => (
                 <Box key={i} sx={{ display: "flex", gap: 1 }}>
-                  <FormControl fullWidth disabled>
+                  <FormControl
+                    fullWidth
+                    disabled
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: "16px",
+                        backgroundColor: "rgba(255,255,255,0.95)",
+                        "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                      },
+                    }}
+                  >
                     <InputLabel>Tipo</InputLabel>
                     <Select value={p.transport || p.type} label="Tipo" disabled>
                       <MenuItem value="tcp">TCP</MenuItem>
                       <MenuItem value="udp">UDP</MenuItem>
                     </Select>
                   </FormControl>
-                  <TextField label="Puerto" type="number" value={p.port} InputProps={{ readOnly: true }} disabled/>
+                  <TextField
+                    label="Puerto"
+                    type="number"
+                    value={p.port}
+                    InputProps={{ readOnly: true }}
+                    disabled
+                    sx={{
+                      width: 180,
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: "16px",
+                        backgroundColor: "rgba(255,255,255,0.95)",
+                        "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                      },
+                    }}
+                  />
                 </Box>
               ))}
 
-              <FormControl fullWidth disabled>
+              <Divider sx={{ my: 0.5 }} />
+
+              <Typography sx={{ fontWeight: 900 }}>Publishers</Typography>
+              <FormControl
+                fullWidth
+                disabled
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
+                  },
+                }}
+              >
                 <InputLabel>Publishers</InputLabel>
-                <Select multiple value={selectedApp.publishers?.map(p => p.publisher_id) || []} disabled>
+                <Select multiple value={selectedApp.publishers?.map((p) => p.publisher_id) || []} disabled>
                   {publishers.map((p) => (
                     <MenuItem key={p.publisher_id} value={p.publisher_id}>
                       {p.publisher_name}
@@ -607,17 +1133,36 @@ export default function PrivateApps() {
                 </Select>
               </FormControl>
 
-              <TextField
-                label="Tags"
-                fullWidth
-                value={formatTagsForDisplay(selectedApp.tags || selectedApp.labels).join(", ") || "Sin tags"}
-                InputProps={{ readOnly: true }} disabled
-              />
+              <Typography sx={{ fontWeight: 900 }}>Tags</Typography>
+              <Box
+                sx={{
+                  ...glassShellSx,
+                  p: 1.6,
+                  background: "rgba(255,255,255,0.75)",
+                }}
+              >
+                {formatTagsForDisplay(selectedApp.tags || selectedApp.labels).length > 0 ? (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    {formatTagsForDisplay(selectedApp.tags || selectedApp.labels).map((t) => (
+                      <Chip key={t} label={t} size="small" sx={chipTypeSx} />
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.6)" }}>
+                    Sin tags
+                  </Typography>
+                )}
+              </Box>
             </>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseViewModal}>Cerrar</Button>
+        <DialogActions sx={{ px: 2.5, py: 2 }}>
+          <Button
+            onClick={handleCloseViewModal}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: "14px" }}
+          >
+            Cerrar
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

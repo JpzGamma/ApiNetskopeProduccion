@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from app.services.netskopeScoreService import (
     get_user_uci,
     get_active_users_uci,
     reset_user_uci,
+    search_users_scim,
 )
 
 router = APIRouter(prefix="/Gamma/score", tags=["Gamma-Score"])
@@ -48,5 +49,21 @@ def gamma_reset_user_uci(
 ):
     try:
         return reset_user_uci(user_email=user_email)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/users/search", summary="Busca usuarios (SCIM) por texto: soporta parcial y exacto")
+def gamma_search_users(
+    query: str = Query(..., description="Texto a buscar (ej: 'aro', 'gamma', 'usuario@dominio.com')"),
+    limit: int = Query(20, description="Máximo de resultados a devolver (1-50)"),
+):
+    """
+    - Si query contiene '@' se asume que es correo/UPN casi exacto => SCIM filter eq
+    - Si es parcial => pagina SCIM y filtra contains en backend hasta completar limit
+    """
+    try:
+        results = search_users_scim(query=query, limit=limit)
+        return {"query": query, "count": len(results), "results": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

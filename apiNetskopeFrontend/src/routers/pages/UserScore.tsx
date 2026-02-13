@@ -1,3 +1,4 @@
+// src/pages/UserScore.tsx
 import { useEffect, useState } from "react";
 import {
   Box,
@@ -23,6 +24,8 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  Autocomplete,
+  Chip,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import SearchIcon from "@mui/icons-material/Search";
@@ -33,7 +36,9 @@ import {
   fetchActiveUsersUCI,
   getUserUCI,
   resetUserUCI,
+  searchUsers,
   type UserScore,
+  type UserSearchItem,
 } from "../../services/UserScore";
 
 export default function UserScorePage() {
@@ -41,17 +46,23 @@ export default function UserScorePage() {
   const [searchEmail, setSearchEmail] = useState("");
   const [searchedUser, setSearchedUser] = useState<UserScore | null>(null);
   const [loading, setLoading] = useState(false);
+
   const [msg, setMsg] = useState<{ type: "success" | "error" | null; text: string }>({
     type: null,
     text: "",
   });
+
   const [confirmReset, setConfirmReset] = useState<{ open: boolean; user?: string }>({
     open: false,
   });
 
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<UserSearchItem[]>([]);
+  const [searchingSuggestions, setSearchingSuggestions] = useState(false);
+
+  // ✅ YA NO BORRA msg por defecto
   const loadActiveUsers = async () => {
     setLoading(true);
-    setMsg({ type: null, text: "" });
     try {
       const data = await fetchActiveUsersUCI();
       setActiveUsers(data);
@@ -63,16 +74,25 @@ export default function UserScorePage() {
     }
   };
 
+  // Refrescar manual: opcionalmente limpia msg
+  const handleRefresh = async () => {
+    setMsg({ type: null, text: "" });
+    await loadActiveUsers();
+  };
+
   useEffect(() => {
     loadActiveUsers();
   }, []);
 
-  const handleSearch = async () => {
-    if (!searchEmail.trim()) return;
+  const handleSearch = async (emailToSearch?: string) => {
+    const email = (emailToSearch ?? searchEmail).trim();
+    if (!email) return;
+
     setLoading(true);
     setMsg({ type: null, text: "" });
+
     try {
-      const user = await getUserUCI(searchEmail.trim());
+      const user = await getUserUCI(email);
       setSearchedUser(user);
     } catch (e: any) {
       setMsg({ type: "error", text: e?.message || "Usuario no encontrado" });
@@ -85,34 +105,40 @@ export default function UserScorePage() {
   const handleBackToTable = () => {
     setSearchedUser(null);
     setSearchEmail("");
+    setSuggestions([]);
   };
 
-const handleReset = async (email: string) => {
-  setLoading(true);
-  setMsg({ type: null, text: "" });
+  // ✅ Fix: no se borra el msg por culpa de loadActiveUsers()
+  const handleReset = async (email: string) => {
+    setLoading(true);
 
-  try {
-    await resetUserUCI(email);
-    setMsg({ type: "success", text: `Score reiniciado para ${email}` });
+    try {
+      await resetUserUCI(email);
 
-    if (searchedUser && searchedUser.user === email) {
-      const updated = await getUserUCI(email);
-      setSearchedUser(updated);
-    } else {
-      await loadActiveUsers();
+      // Mostrar mensaje ANTES del refresh
+      setMsg({ type: "success", text: `Score reiniciado para ${email}` });
+
+      // Si estamos viendo un usuario específico, recargarlo
+      if (searchedUser && searchedUser.user === email) {
+        const updated = await getUserUCI(email);
+        setSearchedUser(updated);
+      } else {
+        // Refrescar tabla sin limpiar el mensaje
+        const data = await fetchActiveUsersUCI();
+        setActiveUsers(data);
+      }
+    } catch (e: any) {
+      const errorText =
+        e?.response?.status === 500
+          ? `No se puede reiniciar el score de ${email}. El usuario no tiene un UCI activo en Netskope.`
+          : e?.message || "Error al reiniciar score";
+
+      setMsg({ type: "error", text: errorText });
+    } finally {
+      setLoading(false);
+      setConfirmReset({ open: false });
     }
-  } catch (e: any) {
-    const errorText =
-      e?.response?.status === 500
-        ? `No se puede reiniciar el score de ${email}. El usuario no tiene un UCI activo en Netskope.`
-        : e?.message || "Error al reiniciar score";
-
-    setMsg({ type: "error", text: errorText });
-  } finally {
-    setLoading(false);
-    setConfirmReset({ open: false });
-  }
-};
+  };
 
   useEffect(() => {
     if (msg.text) {
@@ -123,227 +149,443 @@ const handleReset = async (email: string) => {
 
   const usersToShow = searchedUser ? [searchedUser] : activeUsers;
 
+  // ✅ Autocomplete con debounce
+  useEffect(() => {
+    const q = searchEmail.trim();
+    if (searchedUser) return; // cuando estás en vista individual no mostramos search
+    if (q.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+
+    const t = setTimeout(async () => {
+      try {
+        setSearchingSuggestions(true);
+        const res = await searchUsers(q, 20);
+        setSuggestions(res);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearchingSuggestions(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(t);
+  }, [searchEmail, searchedUser]);
+
+  // --- estilos reutilizables (solo UI) ---
+  const glassShellSx = {
+    borderRadius: "20px",
+    background: "rgba(255, 255, 255, 0.8)",
+    backdropFilter: "blur(20px)",
+    border: "2px solid rgba(255, 255, 255, 0.8)",
+    boxShadow: "0 12px 32px rgba(0, 0, 0, 0.10)",
+  } as const;
+
+  const primaryGradient = "linear-gradient(135deg, #42a5f5, #1976d2)";
+
+  const headerChip = searchedUser ? "Vista individual" : "Activos (últimas 48h)";
+
   return (
     <Box
       sx={{
         minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        p: 2,
-        background:
-          "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+        background: "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {/* blobs decorativos */}
       <Box
         sx={{
-          width: "100%",
-          maxWidth: 1000,
-          borderRadius: 3,
-          boxShadow: "0 8px 16px rgba(0,0,0,0.1)",
-          background:
-            "linear-gradient(135deg, #e3f2fd 0%, #a3c9f1 50%, #d3d9e2 100%)",
+          position: "absolute",
+          top: "-10%",
+          right: "-5%",
+          width: { xs: 320, md: 520 },
+          height: { xs: 320, md: 520 },
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(66, 165, 245, 0.2) 0%, transparent 70%)",
+          filter: "blur(60px)",
+        }}
+      />
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: "-10%",
+          left: "-5%",
+          width: { xs: 280, md: 420 },
+          height: { xs: 280, md: 420 },
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(163, 201, 241, 0.3) 0%, transparent 70%)",
+          filter: "blur(50px)",
+        }}
+      />
+
+      {/* Contenedor principal */}
+      <Box
+        sx={{
+          position: "relative",
+          zIndex: 1,
+          maxWidth: 1200,
+          mx: "auto",
+          px: { xs: 2, md: 6 },
+          pt: { xs: 2, md: 4 },
+          pb: 6,
         }}
       >
-        <Card elevation={0} sx={{ background: "transparent" }}>
-          <CardContent>
-            {/* Logos */}
-            <Box sx={{ display: "flex", justifyContent: "center", gap: 3, mb: 3 }}>
-              <RouterLink to="/home">
-                <Box
-                  component="img"
-                  src="/LogoNetskopeAzul.jpeg"
-                  alt="Logo Netskope"
+        {/* Header superior: logos + back */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            mb: 3,
+            flexWrap: "wrap",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <RouterLink to="/home" style={{ textDecoration: "none" }}>
+              <Box
+                component="img"
+                src="/LogoNetskopeAzul.jpeg"
+                alt="Logo Netskope"
+                sx={{
+                  width: { xs: 56, sm: 64, md: 72 },
+                  height: { xs: 56, sm: 64, md: 72 },
+                  borderRadius: 3,
+                  boxShadow: "0 8px 20px rgba(25, 118, 210, 0.25)",
+                  border: "3px solid rgba(255,255,255,0.85)",
+                }}
+              />
+            </RouterLink>
+
+            <RouterLink to="/home" style={{ textDecoration: "none" }}>
+              <Box
+                component="img"
+                src="/LogoGamma.jpeg"
+                alt="Logo Gamma"
+                sx={{
+                  width: { xs: 56, sm: 64, md: 72 },
+                  height: { xs: 56, sm: 64, md: 72 },
+                  borderRadius: 3,
+                  boxShadow: "0 8px 20px rgba(25, 118, 210, 0.25)",
+                  border: "3px solid rgba(255,255,255,0.85)",
+                }}
+              />
+            </RouterLink>
+          </Box>
+
+          <Button
+            component={RouterLink}
+            to="/home"
+            variant="contained"
+            sx={{
+              textTransform: "none",
+              fontWeight: 700,
+              borderRadius: "14px",
+              px: 2,
+              background: primaryGradient,
+              boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+              "&:hover": { boxShadow: "0 16px 32px rgba(66, 165, 245, 0.30)" },
+            }}
+          >
+            Volver
+          </Button>
+        </Box>
+
+        {/* Card central (glass) */}
+        <Box sx={{ display: "flex", justifyContent: "center" }}>
+          <Card
+            elevation={0}
+            sx={{
+              ...glassShellSx,
+              width: "100%",
+              maxWidth: 1100,
+            }}
+          >
+            <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
+              {/* Título + chips */}
+              <Box sx={{ textAlign: "center", mb: 3 }}>
+                <Typography
                   sx={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 5,
-                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
-                    mb: 2,
+                    fontWeight: 800,
+                    fontSize: { xs: "1.5rem", md: "2.1rem" },
+                    color: "#1a1a1a",
+                    mb: 0.8,
                   }}
-                />
-              </RouterLink>
-              <RouterLink to="/home">
-                <Box
-                  component="img"
-                  src="/LogoGamma.jpeg"
-                  alt="Logo Gamma Ingenieros"
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 5,
-                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
-                    mb: 2,
-                  }}
-                />
-              </RouterLink>
-            </Box>
-
-            <Typography variant="h4" fontWeight={700} align="center" sx={{ mb: 3 }}>
-              Usuario - Score
-            </Typography>
-
-            {/* Barra de búsqueda */}
-            {!searchedUser && (
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={2}
-                justifyContent="center"
-                sx={{ mb: 2 }}
-              >
-                <TextField
-                  placeholder="Buscar usuario por correo"
-                  value={searchEmail}
-                  onChange={(e) => setSearchEmail(e.target.value)}
-                  size="small"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{ width: 300, background: "white", borderRadius: 1 }}
-                />
-                <Button variant="contained" onClick={handleSearch} disabled={loading}>
-                  Buscar
-                </Button>
-                <Tooltip title="Refrescar listado activo 48h">
-                  <span>
-                    <IconButton onClick={loadActiveUsers} disabled={loading}>
-                      <RefreshIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              </Stack>
-            )}
-
-            {msg.type && (
-              <Alert
-                severity={msg.type}
-                onClose={() => setMsg({ type: null, text: "" })}
-                sx={{ mb: 2 }}
-              >
-                {msg.text}
-              </Alert>
-            )}
-
-            {/* Spinner de carga */}
-            {loading ? (
-              <Box sx={{ textAlign: "center", py: 4 }}>
-                <CircularProgress />
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Cargando datos de Netskope...
+                >
+                  Usuario - Score
                 </Typography>
-              </Box>
-            ) : (
-              <>
-                <TableContainer component={Paper} sx={{ maxHeight: 520 }}>
-                  <Table stickyHeader size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Usuario</TableCell>
-                        <TableCell>Último Score</TableCell>
-                        <TableCell align="center">Reiniciar Score</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {usersToShow.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={3} align="center">
-                            Sin resultados
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        usersToShow.map((u) => (
-                          <TableRow key={u.user}>
-                            <TableCell>{u.user}</TableCell>
-                            <TableCell>{u.score ?? "-"}</TableCell>
-                            <TableCell align="center">
-                              <Tooltip title="Reiniciar score">
-                                <IconButton
-                                  color="warning"
-                                  onClick={() =>
-                                    setConfirmReset({ open: true, user: u.user })
-                                  }
-                                >
-                                  <RestartAltIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
 
-                {/* Botón volver a tabla (si se buscó individualmente) */}
-                {searchedUser && (
-                  <Box sx={{ textAlign: "center", mt: 3 }}>
+                <Box sx={{ display: "flex", justifyContent: "center", gap: 1, flexWrap: "wrap" }}>
+                  <Chip
+                    label={headerChip}
+                    sx={{
+                      backgroundColor: "rgba(66, 165, 245, 0.15)",
+                      color: "#1976d2",
+                      fontWeight: 800,
+                      border: "1px solid rgba(66, 165, 245, 0.3)",
+                    }}
+                  />
+                  <Chip
+                    label={`Registros: ${usersToShow.length}`}
+                    sx={{
+                      backgroundColor: "rgba(255, 255, 255, 0.55)",
+                      color: "rgba(0,0,0,0.65)",
+                      fontWeight: 800,
+                      border: "1px solid rgba(255,255,255,0.7)",
+                    }}
+                  />
+                </Box>
+              </Box>
+
+              {/* Barra de búsqueda */}
+              {!searchedUser && (
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1.5}
+                  justifyContent="space-between"
+                  alignItems={{ xs: "stretch", sm: "center" }}
+                  sx={{ mb: 2 }}
+                >
+                  <Autocomplete
+                    freeSolo
+                    options={suggestions}
+                    getOptionLabel={(o) => (typeof o === "string" ? o : o.userName)}
+                    loading={searchingSuggestions}
+                    onChange={(_, value) => {
+                      if (!value) return;
+                      const email = typeof value === "string" ? value : value.userName;
+                      setSearchEmail(email);
+                      void handleSearch(email);
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        placeholder="Buscar usuario por correo "
+                        variant="outlined"
+                        size="small"
+                        value={searchEmail}
+                        onChange={(e) => setSearchEmail(e.target.value)}
+                        InputProps={{
+                          ...params.InputProps,
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <SearchIcon />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          width: { xs: "100%", sm: 520, md: 680 },
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "16px",
+                            background: "rgba(255,255,255,0.75)",
+                            backdropFilter: "blur(14px)",
+                          },
+                        }}
+                      />
+                    )}
+                  />
+
+                  <Stack direction="row" spacing={1} justifyContent="flex-end">
                     <Button
-                      startIcon={<ArrowBackIcon />}
-                      onClick={handleBackToTable}
                       variant="contained"
+                      onClick={() => void handleSearch()}
+                      disabled={loading}
                       sx={{
-                        py: 1.3,
-                        fontWeight: 600,
                         textTransform: "none",
-                        backgroundColor: "#42a5f5",
-                        borderRadius: 2,
-                        boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)",
-                        ":hover": { backgroundColor: "#66b9ff" },
+                        fontWeight: 900,
+                        borderRadius: "14px",
+                        px: 2,
+                        background: primaryGradient,
+                        boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+                        "&:hover": { boxShadow: "0 16px 32px rgba(66, 165, 245, 0.30)" },
+                        "&.Mui-disabled": {
+                          background: "rgba(66,165,245,0.25)",
+                          color: "rgba(0,0,0,0.35)",
+                        },
                       }}
                     >
-                      Volver a la tabla
+                      Buscar
                     </Button>
-                  </Box>
-                )}
-              </>
-            )}
 
-            {/* Botón volver al home */}
-            <Box sx={{ textAlign: "center", mt: 4 }}>
-              <Button
-                component={RouterLink}
-                to="/home"
-                variant="contained"
+                    <Tooltip title="Refrescar listado activo 48h">
+                      <span>
+                        <IconButton
+                          onClick={() => void handleRefresh()}
+                          disabled={loading}
+                          sx={{
+                            borderRadius: "14px",
+                            background: "rgba(255,255,255,0.65)",
+                            border: "1px solid rgba(255,255,255,0.7)",
+                            "&:hover": { background: "rgba(255,255,255,0.85)" },
+                          }}
+                        >
+                          <RefreshIcon />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Stack>
+                </Stack>
+              )}
+
+              {/* Feedback */}
+              {msg.type && (
+                <Alert
+                  severity={msg.type}
+                  onClose={() => setMsg({ type: null, text: "" })}
+                  sx={{
+                    mb: 2,
+                    borderRadius: "16px",
+                    background: "rgba(255,255,255,0.75)",
+                    backdropFilter: "blur(14px)",
+                  }}
+                >
+                  {msg.text}
+                </Alert>
+              )}
+
+              {/* Tabla / Loading */}
+              <Box
                 sx={{
-                  py: 1.3,
-                  fontWeight: 600,
-                  textTransform: "none",
-                  backgroundColor: "#42a5f5",
-                  borderRadius: 2,
-                  boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)",
-                  ":hover": { backgroundColor: "#66b9ff" },
+                  borderRadius: "18px",
+                  overflow: "hidden",
+                  background: "rgba(255,255,255,0.6)",
+                  border: "1px solid rgba(255,255,255,0.7)",
+                  boxShadow: "0 10px 24px rgba(0,0,0,0.08)",
                 }}
               >
-                Volver
-              </Button>
-            </Box>
+                {loading ? (
+                  <Box sx={{ textAlign: "center", py: 5 }}>
+                    <CircularProgress />
+                    <Typography variant="body2" sx={{ mt: 1, color: "rgba(0,0,0,0.6)", fontWeight: 700 }}>
+                      Cargando datos de Netskope...
+                    </Typography>
+                  </Box>
+                ) : (
+                  <TableContainer component={Paper} elevation={0} sx={{ maxHeight: 560, background: "transparent" }}>
+                    <Table stickyHeader size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 900 }}>Usuario</TableCell>
+                          <TableCell sx={{ fontWeight: 900 }}>Último Score</TableCell>
+                          <TableCell sx={{ fontWeight: 900 }} align="center">
+                            Reiniciar Score
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {usersToShow.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} align="center">
+                              Sin resultados
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          usersToShow.map((u) => (
+                            <TableRow key={u.user} hover>
+                              <TableCell sx={{ fontWeight: 800 }}>{u.user}</TableCell>
+                              <TableCell>{u.score ?? "-"}</TableCell>
+                              <TableCell align="center">
+                                <Tooltip title="Reiniciar score">
+                                  <IconButton
+                                    color="warning"
+                                    onClick={() => setConfirmReset({ open: true, user: u.user })}
+                                    sx={{
+                                      borderRadius: "14px",
+                                      background: "rgba(255, 193, 7, 0.12)",
+                                      border: "1px solid rgba(255, 193, 7, 0.20)",
+                                      "&:hover": { background: "rgba(255, 193, 7, 0.18)" },
+                                    }}
+                                  >
+                                    <RestartAltIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
 
-            {/* Footer */}
-            <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
-              <Typography variant="body2">&copy; 2026 Api - Netskope</Typography>
-              <Typography variant="caption">Equipo de Desarrollo Gamma Ingenieros</Typography>
-            </Box>
-          </CardContent>
-        </Card>
+              {searchedUser && (
+                <Box sx={{ textAlign: "center", mt: 3 }}>
+                  <Button
+                    startIcon={<ArrowBackIcon />}
+                    onClick={handleBackToTable}
+                    variant="contained"
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 900,
+                      borderRadius: "14px",
+                      px: 2,
+                      background: primaryGradient,
+                      boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+                      "&:hover": { boxShadow: "0 16px 32px rgba(66, 165, 245, 0.30)" },
+                    }}
+                  >
+                    Volver a la tabla
+                  </Button>
+                </Box>
+              )}
+
+              {/* Footer interno */}
+              <Box sx={{ mt: 4, textAlign: "center" }}>
+                <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.5)", fontWeight: 600 }}>
+                  &copy; 2026 Api - Netskope
+                </Typography>
+                <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.4)", fontSize: "0.85rem" }}>
+                  Equipo de Desarrollo Gamma Ingenieros
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
       </Box>
 
       {/* Modal confirm reset */}
-      <Dialog open={confirmReset.open} onClose={() => setConfirmReset({ open: false })}>
-        <DialogTitle>Confirmar reinicio</DialogTitle>
-        <DialogContent>
+      <Dialog
+        open={confirmReset.open}
+        onClose={() => setConfirmReset({ open: false })}
+        PaperProps={{
+          sx: {
+            borderRadius: "20px",
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(18px)",
+            border: "1px solid rgba(255,255,255,0.9)",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.18)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 900 }}>Confirmar reinicio</DialogTitle>
+        <DialogContent sx={{ color: "rgba(0,0,0,0.75)", fontWeight: 650 }}>
           ¿Deseas reiniciar el score de <b>{confirmReset.user}</b>?
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmReset({ open: false })}>Cancelar</Button>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setConfirmReset({ open: false })} sx={{ textTransform: "none", fontWeight: 800 }}>
+            Cancelar
+          </Button>
           <Button
             variant="contained"
-            color="warning"
-            sx={{ backgroundColor: "#42a5f5", ":hover": { backgroundColor: "#66b9ff" } }}
-            onClick={() => handleReset(confirmReset.user!)}
+            onClick={() => void handleReset(confirmReset.user!)}
+            disabled={loading}
+            sx={{
+              textTransform: "none",
+              fontWeight: 900,
+              borderRadius: "14px",
+              px: 2,
+              background: primaryGradient,
+              boxShadow: "0 10px 24px rgba(25, 118, 210, 0.25)",
+              "&:hover": { boxShadow: "0 16px 32px rgba(66, 165, 245, 0.30)" },
+              "&.Mui-disabled": {
+                background: "rgba(66,165,245,0.25)",
+                color: "rgba(0,0,0,0.35)",
+              },
+            }}
           >
             Reiniciar
           </Button>

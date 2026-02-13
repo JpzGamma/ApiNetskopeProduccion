@@ -6,11 +6,16 @@ export type UserScore = {
   lastActivity?: string;
 };
 
-/**Lista los usuarios activos en las últimas 48h con su UCI (score) */
+export type UserSearchItem = {
+  id?: string;
+  userName: string;
+  displayName?: string;
+  active?: boolean;
+};
+
+/** Lista los usuarios activos en las últimas 48h con su UCI (score) */
 export async function fetchActiveUsersUCI(): Promise<UserScore[]> {
   const { data } = await api.get("/Gamma/score/uci/active");
-
-  console.log("📊 Respuesta bruta de /Gamma/score/uci/active:", data);
 
   const list = Array.isArray(data)
     ? data
@@ -34,24 +39,18 @@ export async function fetchActiveUsersUCI(): Promise<UserScore[]> {
   }));
 }
 
-/** Obtiene el UCI (score) de un usuario específico (usa `user_email`) */
+/** Obtiene el UCI (score) de un usuario específico */
 export async function getUserUCI(userEmail: string): Promise<UserScore> {
   const { data } = await api.get("/Gamma/score/uci", {
-    params: { user_email: userEmail }, 
+    params: { user_email: userEmail },
   });
 
-  console.log("📈 Respuesta bruta de /Gamma/score/uci:", data);
-
   if (data?.confidences && Array.isArray(data.confidences)) {
-    const latest = [...data.confidences].sort(
-      (a, b) => b.start - a.start
-    )[0];
+    const latest = [...data.confidences].sort((a, b) => b.start - a.start)[0];
     return {
       user: data.userId ?? userEmail,
       score: latest?.confidenceScore ?? null,
-      lastActivity: latest?.start
-        ? new Date(latest.start).toLocaleString()
-        : undefined,
+      lastActivity: latest?.start ? new Date(latest.start).toLocaleString() : undefined,
     };
   }
 
@@ -70,10 +69,24 @@ export async function getUserUCI(userEmail: string): Promise<UserScore> {
   };
 }
 
-/** Reinicia el UCI (score) de un usuario (usa también `user_email`) */
+/** Reinicia el UCI (score) de un usuario */
 export async function resetUserUCI(userEmail: string): Promise<void> {
   await api.post("/Gamma/score/uci/reset", null, {
-    params: { user_email: userEmail }, 
+    params: { user_email: userEmail },
   });
-  console.log(`♻️ Score reiniciado para ${userEmail}`);
+}
+
+/** ✅ Nuevo: sugerencias por búsqueda (SCIM) */
+export async function searchUsers(query: string, limit = 20): Promise<UserSearchItem[]> {
+  const { data } = await api.get("/Gamma/score/users/search", {
+    params: { query, limit },
+  });
+
+  const results = Array.isArray(data?.results) ? data.results : [];
+  return results.map((r: any) => ({
+    id: r.id,
+    userName: r.userName ?? r.user ?? r.email,
+    displayName: r.displayName,
+    active: r.active,
+  }));
 }

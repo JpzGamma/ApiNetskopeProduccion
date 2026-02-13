@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   TextField,
   Button,
@@ -9,10 +9,14 @@ import {
   CardContent,
   Typography,
   InputAdornment,
+  IconButton,
 } from "@mui/material";
 import { reset } from "../../services/auth"; // Debe aceptar { correo, codigo, new_password }
-import { useNavigate, Link as RouterLink } from "react-router-dom";
-import { Lock, Mail, Password } from "@mui/icons-material";
+import { useNavigate, Link as RouterLink, useLocation } from "react-router-dom";
+import { Lock, Mail, Password, Visibility, VisibilityOff } from "@mui/icons-material";
+
+const RESET_EMAIL_KEY = "reset_email";
+const LAST_LOGIN_EMAIL_KEY = "last_login_email";
 
 export default function ResetPasswordPage() {
   const [correo, setCorreo] = useState("");
@@ -20,7 +24,21 @@ export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  const [showCode, setShowCode] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
   const nav = useNavigate();
+  const location = useLocation();
+
+  // ✅ Autollenar correo si viene de Forgot (state) o localStorage
+  useEffect(() => {
+    const stateEmail = (location.state as any)?.correo as string | undefined;
+    const saved = localStorage.getItem(RESET_EMAIL_KEY);
+
+    const emailToUse = (stateEmail || saved || "").trim();
+    if (emailToUse) setCorreo(emailToUse);
+  }, [location.state]);
 
   const validarPassword = (p: string) =>
     p.length >= 8 &&
@@ -51,13 +69,28 @@ export default function ResetPasswordPage() {
     }
 
     try {
+      const email = correo.trim();
+
       const res = await reset({
-        correo: correo.trim(),
+        correo: email,
         codigo: codigo.trim(),
         new_password: newPassword,
       });
+
       setMsg(res.message || "Contraseña actualizada correctamente");
-      setTimeout(() => nav("/login"), 800);
+
+      // ✅ Guardar correo para autollenar en login (solo si viene de reset)
+      localStorage.setItem(LAST_LOGIN_EMAIL_KEY, email);
+
+      // (Opcional) ya no se necesita reset_email
+      // localStorage.removeItem(RESET_EMAIL_KEY);
+
+      setTimeout(() => {
+        nav("/login", {
+          replace: true,
+          state: { fromReset: true, correo: email },
+        });
+      }, 800);
     } catch (e: any) {
       setErr(e?.response?.data?.detail || "Error al restablecer contraseña");
     }
@@ -97,7 +130,7 @@ export default function ResetPasswordPage() {
         >
           <CardContent sx={{ p: 4 }}>
             {/* Logo */}
-            <Box sx={{ display: 'flex', justifyContent: 'center',gap:3, mb: 3 }}>
+            <Box sx={{ display: "flex", justifyContent: "center", gap: 3, mb: 3 }}>
               <RouterLink to="/home">
                 <Box
                   component="img"
@@ -117,7 +150,7 @@ export default function ResetPasswordPage() {
               <RouterLink to="/home">
                 <Box
                   component="img"
-                  src="/LogoGamma.jpeg" 
+                  src="/LogoGamma.jpeg"
                   alt="Logo Nuevo"
                   sx={{
                     width: 80,
@@ -140,8 +173,8 @@ export default function ResetPasswordPage() {
               color="text.secondary"
               sx={{ mb: 3 }}
             >
-              Ingresa tu correo, el <b>código de 6 dígitos</b> recibido y tu
-              nueva contraseña.
+              Ingresa tu correo, el <b>código de 6 dígitos</b> recibido y tu nueva
+              contraseña.
             </Typography>
 
             <form onSubmit={onSubmit} autoComplete="off">
@@ -182,8 +215,8 @@ export default function ResetPasswordPage() {
                 <TextField
                   label="Código (6 dígitos)"
                   value={codigo}
+                  type={showCode ? "text" : "password"}
                   onChange={(e) => {
-                    // Solo dígitos, máximo 6
                     const v = e.target.value.replace(/\D/g, "").slice(0, 6);
                     setCodigo(v);
                   }}
@@ -197,12 +230,36 @@ export default function ResetPasswordPage() {
                         <Password color="action" />
                       </InputAdornment>
                     ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => setShowCode((v) => !v)}
+                          edge="end"
+                          aria-label={showCode ? "Ocultar código" : "Mostrar código"}
+                        >
+                          {showCode ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    "& input:-webkit-autofill": {
+                      WebkitBoxShadow: "0 0 0 1000px transparent inset",
+                      WebkitTextFillColor: "inherit",
+                      caretColor: "inherit",
+                      transition: "background-color 9999s ease-out 0s",
+                    },
+                    "& input:-webkit-autofill:focus": {
+                      WebkitBoxShadow: "0 0 0 1000px transparent inset",
+                      WebkitTextFillColor: "inherit",
+                      caretColor: "inherit",
+                    },
                   }}
                 />
 
                 <TextField
                   label="Nueva contraseña"
-                  type="password"
+                  type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   fullWidth
@@ -212,6 +269,21 @@ export default function ResetPasswordPage() {
                     startAdornment: (
                       <InputAdornment position="start">
                         <Lock color="action" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => setShowNewPassword((v) => !v)}
+                          edge="end"
+                          aria-label={
+                            showNewPassword
+                              ? "Ocultar contraseña"
+                              : "Mostrar contraseña"
+                          }
+                        >
+                          {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
                       </InputAdornment>
                     ),
                   }}
@@ -261,15 +333,13 @@ export default function ResetPasswordPage() {
             </form>
           </CardContent>
         </Card>
+
         {/* Footer */}
         <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
-          <Typography variant="body2">
-           © {new Date().getFullYear()} ApiNetskope
-          </Typography>
+          <Typography variant="body2">© {new Date().getFullYear()} ApiNetskope</Typography>
           Equipo de Desarrollo Gamma Ingenieros
         </Box>
       </Box>
-
     </Box>
   );
 }

@@ -52,7 +52,7 @@ export default function ChatBotWindow({ onClose }: ChatBotWindowProps) {
       // Obtener el texto de la respuesta primero
       const contentType = res.headers.get("content-type");
       const responseText = await res.text();
-      
+
       console.log("Content-Type:", contentType);
       console.log("Respuesta como texto:", responseText);
 
@@ -63,7 +63,7 @@ export default function ChatBotWindow({ onClose }: ChatBotWindowProps) {
         try {
           const data = JSON.parse(responseText);
           console.log("Datos parseados como JSON:", data);
-          
+
           // Buscar la respuesta en diferentes campos posibles
           if (data.answer) {
             botAnswer = data.answer;
@@ -78,8 +78,13 @@ export default function ChatBotWindow({ onClose }: ChatBotWindowProps) {
           } else if (Array.isArray(data) && data.length > 0) {
             // n8n a veces devuelve un array
             const firstItem = data[0];
-            botAnswer = firstItem.answer || firstItem.output || firstItem.response || 
-                       firstItem.text || firstItem.message || JSON.stringify(firstItem, null, 2);
+            botAnswer =
+              firstItem.answer ||
+              firstItem.output ||
+              firstItem.response ||
+              firstItem.text ||
+              firstItem.message ||
+              JSON.stringify(firstItem, null, 2);
           } else {
             // Si no encuentra ningún campo conocido, mostrar el objeto completo
             botAnswer = JSON.stringify(data, null, 2);
@@ -98,9 +103,9 @@ export default function ChatBotWindow({ onClose }: ChatBotWindowProps) {
       // Limpiar el mensaje si viene con caracteres extraños
       botAnswer = botAnswer.trim();
 
-      const botMsg = { 
-        from: "bot" as const, 
-        answer: botAnswer || "Sin respuesta del servidor 😅" 
+      const botMsg = {
+        from: "bot" as const,
+        answer: botAnswer || "Sin respuesta del servidor 😅",
       };
       setMessages((prev) => [...prev, botMsg]);
     } catch (error) {
@@ -108,9 +113,9 @@ export default function ChatBotWindow({ onClose }: ChatBotWindowProps) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       setMessages((prev) => [
         ...prev,
-        { 
-          from: "bot", 
-          answer: `❌ Error de conexión con el chatbot.\n\nDetalles: ${errorMessage}\n\nPor favor, verifica la consola del navegador.` 
+        {
+          from: "bot",
+          answer: `❌ Error de conexión con el chatbot.\n\nDetalles: ${errorMessage}\n\nPor favor, verifica la consola del navegador.`,
         },
       ]);
     } finally {
@@ -149,10 +154,7 @@ export default function ChatBotWindow({ onClose }: ChatBotWindowProps) {
           alignItems: "center",
         }}
       >
-        <Typography
-          variant={isMobile ? "subtitle2" : "subtitle1"}
-          sx={{ fontWeight: 600 }}
-        >
+        <Typography variant={isMobile ? "subtitle2" : "subtitle1"} sx={{ fontWeight: 600 }}>
           🤖 GammIA
         </Typography>
         <Button
@@ -261,7 +263,7 @@ export default function ChatBotWindow({ onClose }: ChatBotWindowProps) {
               fontWeight: 600,
               textTransform: "none",
               borderRadius: "999px",
-              background: isLoading 
+              background: isLoading
                 ? "linear-gradient(90deg, #bdbdbd, #9e9e9e)"
                 : "linear-gradient(90deg, #42a5f5, #66b9ff)",
               boxShadow: "0 6px 16px rgba(0,0,0,0.25)",

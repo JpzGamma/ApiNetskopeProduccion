@@ -16,6 +16,7 @@ import Groups from "./pages/Groups";
 import PrivateApps from "./pages/PrivateApps";
 import Policies from "./pages/Policies";
 import Score from "./pages/UserScore";
+import Verify2FAPage from "./pages/Verify2FAPage";
 
 export default function AppRouter() {
   return (
@@ -26,6 +27,7 @@ export default function AppRouter() {
         {/* Públicas */}
         <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/verify-2fa" element={<Verify2FAPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/forgot" element={<ForgotPage />} />

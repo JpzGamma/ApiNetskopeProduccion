@@ -10,36 +10,53 @@ import {
   Typography,
   Box,
   InputAdornment,
+  IconButton,
 } from '@mui/material';
 import { verify } from '../../services/auth';
 import {
   useSearchParams,
   useNavigate,
   Link as RouterLink,
+  useLocation,
 } from 'react-router-dom';
-import { Email, Lock } from '@mui/icons-material';
+import { Email, Lock, Visibility, VisibilityOff } from '@mui/icons-material';
 
 export default function VerifyPage() {
   const [sp] = useSearchParams();
+  const location = useLocation();
+
   const [correo, setCorreo] = useState('');
   const [codigo, setCodigo] = useState('');
+  const [showCode, setShowCode] = useState(false);
+
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const nav = useNavigate();
 
   useEffect(() => {
-    const q = sp.get('correo');
-    if (q) setCorreo(q);
-  }, [sp]);
+    // ✅ Prioridad: correo desde state (viene del registro)
+    const stateCorreo = (location.state as any)?.correo as string | undefined;
+
+    // ✅ Fallback: correo desde query param (compatibilidad)
+    const q = sp.get('correo') || undefined;
+
+    if (stateCorreo) setCorreo(stateCorreo);
+    else if (q) setCorreo(q);
+  }, [sp, location.state]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     setMsg(null);
+
     try {
-      const res = await verify({ correo, codigo });
+      const res = await verify({ correo: correo.trim(), codigo: codigo.trim() });
       setMsg(res.message);
-      setTimeout(() => nav('/login'), 800);
+
+      setTimeout(() => {
+        // ✅ Pasamos correo a login SOLO si vienes de este flujo
+        nav('/login', { state: { correo: correo.trim(), fromVerify: true } });
+      }, 800);
     } catch (e: any) {
       setErr(e?.response?.data?.detail || 'Error al verificar');
     }
@@ -79,8 +96,8 @@ export default function VerifyPage() {
           }}
         >
           <CardContent sx={{ p: 4 }}>
-           {/* Logo */}
-            <Box sx={{ display: 'flex', justifyContent: 'center',gap:3, mb: 3 }}>
+            {/* Logo */}
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mb: 3 }}>
               <RouterLink to="/home">
                 <Box
                   component="img"
@@ -90,9 +107,9 @@ export default function VerifyPage() {
                     width: 80,
                     height: 80,
                     borderRadius: 5,
-                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                    boxShadow: '0 6px 12px rgba(0, 0, 0, 0.4)',
                     mb: 2,
-                    mx: "auto",
+                    mx: 'auto',
                   }}
                 />
               </RouterLink>
@@ -100,26 +117,21 @@ export default function VerifyPage() {
               <RouterLink to="/home">
                 <Box
                   component="img"
-                  src="/LogoGamma.jpeg" 
+                  src="/LogoGamma.jpeg"
                   alt="Logo Nuevo"
                   sx={{
                     width: 80,
                     height: 80,
                     borderRadius: 5,
-                    boxShadow: "0 6px 12px rgba(0, 0, 0, 0.4)",
+                    boxShadow: '0 6px 12px rgba(0, 0, 0, 0.4)',
                     mb: 2,
-                    mx: "auto",
+                    mx: 'auto',
                   }}
                 />
               </RouterLink>
             </Box>
 
-            <Typography
-              variant="h6"
-              fontWeight={600}
-              align="center"
-              sx={{ mb: 1 }}
-            >
+            <Typography variant="h6" fontWeight={600} align="center" sx={{ mb: 1 }}>
               Verificar Correo
             </Typography>
             <Typography
@@ -133,8 +145,19 @@ export default function VerifyPage() {
 
             <form onSubmit={onSubmit}>
               {/* Hack para evitar autocompletado molesto */}
-              <input type="text" name="fakeuser" autoComplete="username" style={{ display: "none" }} />
-              <input type="password" name="fakepass" autoComplete="new-password" style={{ display: "none" }} />
+              <input
+                type="text"
+                name="fakeuser"
+                autoComplete="username"
+                style={{ display: 'none' }}
+              />
+              <input
+                type="password"
+                name="fakepass"
+                autoComplete="new-password"
+                style={{ display: 'none' }}
+              />
+
               <Stack spacing={2}>
                 {msg && <Alert severity="success">{msg}</Alert>}
                 {err && <Alert severity="error">{err}</Alert>}
@@ -156,9 +179,10 @@ export default function VerifyPage() {
                   }}
                 />
 
-                {/* Código de verificación */}
+                {/* Código de verificación (oculto con 👁️) */}
                 <TextField
                   label="Código de verificación"
+                  type={showCode ? 'text' : 'password'}
                   value={codigo}
                   onChange={(e) => setCodigo(e.target.value)}
                   fullWidth
@@ -167,6 +191,17 @@ export default function VerifyPage() {
                     startAdornment: (
                       <InputAdornment position="start">
                         <Lock color="action" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label={showCode ? 'Ocultar código' : 'Mostrar código'}
+                          onClick={() => setShowCode((v) => !v)}
+                          edge="end"
+                        >
+                          {showCode ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
                       </InputAdornment>
                     ),
                   }}
@@ -227,11 +262,10 @@ export default function VerifyPage() {
             </form>
           </CardContent>
         </Card>
+
         {/* Footer */}
-        <Box sx={{ mt: 4, textAlign: "center", color: "text.secondary" }}>
-          <Typography variant="body2">
-            &copy; 2026 Api - Netskope
-          </Typography>
+        <Box sx={{ mt: 4, textAlign: 'center', color: 'text.secondary' }}>
+          <Typography variant="body2">&copy; 2026 Api - Netskope</Typography>
           Equipo de Desarrollo Gamma Ingenieros
         </Box>
       </Box>
